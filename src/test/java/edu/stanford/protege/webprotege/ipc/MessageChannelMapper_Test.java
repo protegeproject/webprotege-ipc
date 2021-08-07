@@ -1,8 +1,5 @@
 package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.ipc.MessageChannelMapper;
-import edu.stanford.protege.webprotege.ipc.Request;
-import edu.stanford.protege.webprotege.ipc.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;

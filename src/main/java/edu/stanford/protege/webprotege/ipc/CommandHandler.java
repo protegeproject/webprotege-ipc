@@ -1,7 +1,5 @@
 package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.ipc.Request;
-import edu.stanford.protege.webprotege.ipc.Response;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Nonnull;

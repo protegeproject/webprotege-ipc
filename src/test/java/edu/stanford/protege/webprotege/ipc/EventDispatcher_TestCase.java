@@ -1,7 +1,5 @@
 package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.ipc.Event;
-import edu.stanford.protege.webprotege.ipc.EventDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
