@@ -2,10 +2,6 @@ package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
-import edu.stanford.protege.webprotege.ipc.cmd.MessageChannelMapper;
-import edu.stanford.protege.webprotege.ipc.cmd.ReplyingKafkaTemplateFactory;
-import edu.stanford.protege.webprotege.ipc.cmd.ReplyingKafkaTemplateFactoryImpl;
-import edu.stanford.protege.webprotege.ipc.event.EventDispatcher;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

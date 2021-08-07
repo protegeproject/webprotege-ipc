@@ -1,4 +1,4 @@
-package edu.stanford.protege.webprotege.ipc.handler;
+package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;

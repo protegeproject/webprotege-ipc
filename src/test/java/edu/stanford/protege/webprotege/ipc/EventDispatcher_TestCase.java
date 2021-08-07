@@ -1,13 +1,12 @@
-package edu.stanford.protege.webprotege.ipc.event;
+package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
+import edu.stanford.protege.webprotege.ipc.Event;
+import edu.stanford.protege.webprotege.ipc.EventDispatcher;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.kafka.annotation.KafkaListener;
 
 import java.util.concurrent.CountDownLatch;

@@ -1,4 +1,4 @@
-package edu.stanford.protege.webprotege.ipc.cmd;
+package edu.stanford.protege.webprotege.ipc;
 
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ProducerFactory;

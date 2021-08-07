@@ -1,18 +1,16 @@
-package edu.stanford.protege.webprotege.ipc.handler;
+package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
-import edu.stanford.protege.webprotege.ipc.cmd.ReplyingKafkaTemplateFactory;
-import edu.stanford.protege.webprotege.ipc.cmd.Request;
-import edu.stanford.protege.webprotege.ipc.cmd.Response;
+import edu.stanford.protege.webprotege.ipc.CommandHandler;
+import edu.stanford.protege.webprotege.ipc.ReplyingKafkaTemplateFactory;
+import edu.stanford.protege.webprotege.ipc.Request;
+import edu.stanford.protege.webprotege.ipc.Response;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.support.MessageBuilder;
 import reactor.core.publisher.Mono;

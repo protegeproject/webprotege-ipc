@@ -1,4 +1,4 @@
-package edu.stanford.protege.webprotege.ipc.cmd;
+package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;

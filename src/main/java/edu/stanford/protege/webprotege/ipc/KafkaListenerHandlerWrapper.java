@@ -1,9 +1,7 @@
-package edu.stanford.protege.webprotege.ipc.handler;
+package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import edu.stanford.protege.webprotege.ipc.cmd.Request;
-import edu.stanford.protege.webprotege.ipc.cmd.Response;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;

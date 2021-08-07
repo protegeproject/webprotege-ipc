@@ -1,16 +1,15 @@
-package edu.stanford.protege.webprotege.ipc.cmd;
+package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
+import edu.stanford.protege.webprotege.ipc.CommandExecutor;
+import edu.stanford.protege.webprotege.ipc.Request;
+import edu.stanford.protege.webprotege.ipc.Response;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Import;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.messaging.handler.annotation.SendTo;
-import org.springframework.test.annotation.DirtiesContext;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;

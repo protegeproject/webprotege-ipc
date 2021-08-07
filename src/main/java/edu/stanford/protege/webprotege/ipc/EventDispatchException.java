@@ -1,4 +1,4 @@
-package edu.stanford.protege.webprotege.ipc.event;
+package edu.stanford.protege.webprotege.ipc;
 
 /**
  * Matthew Horridge
