@@ -1,5 +1,8 @@
 package edu.stanford.protege.webprotege.ipc;
 
+import edu.stanford.protege.webprotege.common.Request;
+import edu.stanford.protege.webprotege.common.Response;
+
 /**
  * Matthew Horridge
  * Stanford Center for Biomedical Informatics Research

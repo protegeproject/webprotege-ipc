@@ -1,5 +1,7 @@
 package edu.stanford.protege.webprotege.ipc;
 
+import edu.stanford.protege.webprotege.common.Request;
+import edu.stanford.protege.webprotege.common.Response;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;

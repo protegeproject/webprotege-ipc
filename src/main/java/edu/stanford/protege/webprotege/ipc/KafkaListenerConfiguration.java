@@ -37,7 +37,7 @@ public class KafkaListenerConfiguration implements KafkaListenerConfigurer {
 
     private final MessageHandlerMethodFactory messageHandlerMethodFactory = new DefaultMessageHandlerMethodFactory();
 
-    @Value("${spring.kafka.consumer.group-id}")
+    @Value("${spring.kafka.consumer.group-id}:default")
     private String groupId;
 
     @Value("${spring.application.name}")

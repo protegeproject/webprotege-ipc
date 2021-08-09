@@ -2,6 +2,8 @@ package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.common.Request;
+import edu.stanford.protege.webprotege.common.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 import org.springframework.messaging.support.MessageBuilder;
