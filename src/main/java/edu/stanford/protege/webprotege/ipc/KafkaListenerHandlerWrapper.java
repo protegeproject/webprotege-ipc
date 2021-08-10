@@ -11,6 +11,7 @@ import org.apache.kafka.common.header.internals.RecordHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.support.KafkaHeaders;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -43,6 +44,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
     }
 
     public void handleMessage(final ConsumerRecord<String, String> record) {
+        logger.info("Handling message: " + record.value());
         var inboundHeaders = record.headers();
         var replyTopicHeader = inboundHeaders.lastHeader(REPLY_TOPIC);
         if (replyTopicHeader == null) {
@@ -60,7 +62,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
         var request = deserializeRequest(payload);
 
         if(request == null) {
-            logger.debug("Unable to parse request.  Not handling message.");
+            logger.error("Unable to parse request.  Not handling message.");
             return;
         }
         // TODO: Handle execution exception
@@ -68,7 +70,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
         response.subscribe(r -> {
             var replyPayload = serializeResponse(r);
             if(replyPayload == null) {
-                logger.debug("Unable to serialize response.  Not handling reply message.");
+                logger.error("Unable to serialize response.  Not handling reply message.");
                 return;
             }
             var replyHeaders = Arrays.<Header>asList(
@@ -81,6 +83,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
                                              replyPayload,
                                              replyHeaders);
             replyTemplate.send(reply);
+            logger.info("Sent reply");
         });
 
     }

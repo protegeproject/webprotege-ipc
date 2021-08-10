@@ -9,6 +9,7 @@ import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 
@@ -40,26 +41,29 @@ public class CommandExecutor<Q extends Request<R>, R extends Response> {
         this.responseClass = responseClass;
     }
 
-    public CompletableFuture<R> execute(Q request) throws IOException, ExecutionException, InterruptedException {
-        var replyTopic = channelMapper.getReplyChannelName(request);
-        ensureFactory(replyTopic);
-        var json = objectMapper.writeValueAsString(request);
-        var topic = channelMapper.getChannelName(request);
-        var msg = MessageBuilder.withPayload(json)
-                                .setHeader(REPLY_TOPIC, replyTopic)
-                                .setHeader(TOPIC, topic)
-                                .build();
-        var replyFuture = template.sendAndReceive(msg);
-        // TODO:  Wrap Future
-        return replyFuture.completable().thenApply(f -> {
-            try {
-                var replyJson = (String) f.getPayload();
-                return objectMapper.readValue(replyJson, responseClass);
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        });
-
+    public CompletableFuture<R> execute(Q request) {
+        try {
+            var replyTopic = channelMapper.getReplyChannelName(request);
+            ensureFactory(replyTopic);
+            var json = objectMapper.writeValueAsString(request);
+            var topic = channelMapper.getChannelName(request);
+            var msg = MessageBuilder.withPayload(json)
+                                    .setHeader(REPLY_TOPIC, replyTopic)
+                                    .setHeader(TOPIC, topic)
+                                    .build();
+            var replyFuture = template.sendAndReceive(msg);
+            // TODO:  Wrap Future
+            return replyFuture.completable().thenApply(f -> {
+                try {
+                    var replyJson = (String) f.getPayload();
+                    return objectMapper.readValue(replyJson, responseClass);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException(e);
+                }
+            });
+        } catch (JsonProcessingException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private synchronized void ensureFactory(String replyTopic) {
