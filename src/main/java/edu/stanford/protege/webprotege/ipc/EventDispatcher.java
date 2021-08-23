@@ -2,6 +2,7 @@ package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.common.Event;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.support.KafkaHeaders;
 import org.springframework.messaging.support.MessageBuilder;
@@ -27,7 +28,7 @@ public class EventDispatcher {
         try {
             var json = objectMapper.writeValueAsString(event);
             var message = MessageBuilder.withPayload(json)
-                                        .setHeader(KafkaHeaders.TOPIC, event.getChannelName())
+                                        .setHeader(KafkaHeaders.TOPIC, event.getChannel())
                                         .build();
             kafkaTemplate.send(message);
         } catch (JsonProcessingException e) {

@@ -25,9 +25,15 @@ public class WebProtegeIpcApplication {
 	}
 
 	@Bean
+	ReplyErrorChecker replyErrorChecker(ObjectMapper objectMapper) {
+		return new ReplyErrorChecker(objectMapper);
+	}
+
+	@Bean
 	ReplyingKafkaTemplateFactory replyingKafkaTemplateFactory(ConcurrentKafkaListenerContainerFactory<String, String> containerFactory,
-															  ProducerFactory<String, String> producerFactory) {
-		return new ReplyingKafkaTemplateFactoryImpl(containerFactory, producerFactory);
+															  ProducerFactory<String, String> producerFactory,
+															  ReplyErrorChecker replyErrorChecker) {
+		return new ReplyingKafkaTemplateFactoryImpl(containerFactory, producerFactory, replyErrorChecker);
 	}
 
 	@Bean

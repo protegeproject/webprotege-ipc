@@ -60,7 +60,7 @@ public class KafkaListenerConfiguration implements KafkaListenerConfigurer {
     private void createAndRegisterListener(final CommandHandler<?, ?> handler,
                                            final Method listenerMethod,
                                            final KafkaListenerEndpointRegistrar registrar) {
-        logger.debug("Registering {} endpoint on topic {}", handler.getClass(), handler.getChannelName());
+        logger.info("Registering {} endpoint on topic {}", handler.getClass(), handler.getChannelName());
         var endpoint = createListenerEndpoint(handler, listenerMethod);
         registrar.registerEndpoint(endpoint);
     }

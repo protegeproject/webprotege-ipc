@@ -50,12 +50,13 @@ public class CommandHandler_Tests {
 
     @Test
     void shouldReceiveMessageOnHandler() throws InterruptedException, ExecutionException, JsonProcessingException, TimeoutException {
-        var template = replyingKafkaTemplateFactory.create("TheTestTopic-Replies");
+        var template = replyingKafkaTemplateFactory.create("TestService-TheTestTopic-Replies");
         template.start();
         var payload = objectMapper.writeValueAsString(new TestRequest("Hello World"));
         var msg = MessageBuilder.withPayload(payload)
                                          .setHeader(KafkaHeaders.TOPIC, "TheTestTopic")
-                                         .setReplyChannelName("TheTestTopic-Replies")
+                .setHeader(Headers.USER_ID, "JohnSmith")
+                                         .setReplyChannelName("TestService-TheTestTopic-Replies")
                                          .build();
         var result = template.sendAndReceive(msg, Duration.ofMillis(4000000));
         var replyPayload = result.get(400, TimeUnit.SECONDS).getPayload();
@@ -99,7 +100,7 @@ public class CommandHandler_Tests {
         }
 
         @Override
-        public Mono<TestRespose> handleRequest(TestRequest request) {
+        public Mono<TestRespose> handleRequest(TestRequest request, ExecutionContext executionContext) {
             System.out.println("Handling record: " + request);
             countDownLatch.countDown();
             return Mono.just(new TestRespose(request.content().toUpperCase()));

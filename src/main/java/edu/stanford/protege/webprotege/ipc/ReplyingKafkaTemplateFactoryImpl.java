@@ -23,10 +23,14 @@ public class ReplyingKafkaTemplateFactoryImpl implements ReplyingKafkaTemplateFa
 
     private final ProducerFactory<String, String> producerFactory;
 
+    private final ReplyErrorChecker replyErrorChecker;
+
     public ReplyingKafkaTemplateFactoryImpl(ConcurrentKafkaListenerContainerFactory<String, String> containerFactory,
-                                            ProducerFactory<String, String> producerFactory) {
+                                            ProducerFactory<String, String> producerFactory,
+                                            ReplyErrorChecker replyErrorChecker) {
         this.containerFactory = containerFactory;
         this.producerFactory = producerFactory;
+        this.replyErrorChecker = replyErrorChecker;
     }
 
     @Override
@@ -36,6 +40,7 @@ public class ReplyingKafkaTemplateFactoryImpl implements ReplyingKafkaTemplateFa
         var template = new ReplyingKafkaTemplate<>(producerFactory, container);
         template.setSharedReplyTopic(true);
         template.setDefaultReplyTimeout(Duration.of(1, ChronoUnit.MINUTES));
+        template.setReplyErrorChecker(replyErrorChecker);
         return template;
     }
 

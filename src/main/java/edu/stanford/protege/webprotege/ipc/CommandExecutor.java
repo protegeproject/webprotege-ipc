@@ -41,7 +41,7 @@ public class CommandExecutor<Q extends Request<R>, R extends Response> {
         this.responseClass = responseClass;
     }
 
-    public CompletableFuture<R> execute(Q request) {
+    public CompletableFuture<R> execute(Q request, ExecutionContext executionContext) {
         try {
             var replyTopic = channelMapper.getReplyChannelName(request);
             ensureFactory(replyTopic);
@@ -50,6 +50,7 @@ public class CommandExecutor<Q extends Request<R>, R extends Response> {
             var msg = MessageBuilder.withPayload(json)
                                     .setHeader(REPLY_TOPIC, replyTopic)
                                     .setHeader(TOPIC, topic)
+                    .setHeader(Headers.USER_ID, executionContext.userId().value())
                                     .build();
             var replyFuture = template.sendAndReceive(msg);
             // TODO:  Wrap Future

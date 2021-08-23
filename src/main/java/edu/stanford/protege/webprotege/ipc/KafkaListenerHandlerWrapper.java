@@ -4,17 +4,22 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
+import edu.stanford.protege.webprotege.common.UserId;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.header.Header;
 import org.apache.kafka.common.header.internals.RecordHeader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.KafkaHeaders;
+import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.List;
 
 import static org.springframework.kafka.support.KafkaHeaders.*;
 
@@ -44,48 +49,100 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
     }
 
     public void handleMessage(final ConsumerRecord<String, String> record) {
+
         logger.info("Handling message: " + record.value());
         var inboundHeaders = record.headers();
+        var replyHeaders = new ArrayList<Header>();
+
         var replyTopicHeader = inboundHeaders.lastHeader(REPLY_TOPIC);
         if (replyTopicHeader == null) {
             logger.error(REPLY_TOPIC + " header is missing.  Cannot reply to message.");
             return;
         }
+        replyHeaders.add(new RecordHeader(TOPIC, replyTopicHeader.value()));
+
         var correlationHeader = inboundHeaders.lastHeader(CORRELATION_ID);
         if(correlationHeader == null) {
             logger.error(CORRELATION_ID + " header is missing.  Cannot process message.");
             return;
         }
+        replyHeaders.add(new RecordHeader(CORRELATION_ID, correlationHeader.value()));
+
+        var userIdHeader = inboundHeaders.lastHeader(Headers.USER_ID);
+        if(userIdHeader == null) {
+            logger.error(Headers.USER_ID + " header is missing.  Cannot process message.  Treating as unauthorized.");
+            sendError(record, replyTopicHeader, replyHeaders, HttpStatus.UNAUTHORIZED);
+            return;
+        }
+        replyHeaders.add(new RecordHeader(Headers.USER_ID, userIdHeader.value()));
 
         var payload = record.value();
-
         var request = deserializeRequest(payload);
 
         if(request == null) {
-            logger.error("Unable to parse request.  Not handling message.");
+            logger.error("Unable to parse request");
+            sendError(record, replyTopicHeader, replyHeaders, HttpStatus.BAD_REQUEST);
             return;
         }
-        // TODO: Handle execution exception
-        var response = commandHandler.handleRequest(request);
-        response.subscribe(r -> {
-            var replyPayload = serializeResponse(r);
-            if(replyPayload == null) {
-                logger.error("Unable to serialize response.  Not handling reply message.");
-                return;
-            }
-            var replyHeaders = Arrays.<Header>asList(
-                    new RecordHeader(TOPIC, replyTopicHeader.value()),
-                    new RecordHeader(CORRELATION_ID, correlationHeader.value()));
+        var userId = new UserId(new String(userIdHeader.value(), StandardCharsets.UTF_8));
+        var executionContext = new ExecutionContext(userId);
 
-            var reply = new ProducerRecord<>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
-                                             record.partition(),
-                                             record.key(),
-                                             replyPayload,
-                                             replyHeaders);
-            replyTemplate.send(reply);
-            logger.info("Sent reply");
-        });
+        try {
+            Mono<R> response = commandHandler.handleRequest(request, executionContext);
+            response.subscribe(r -> {
+                var replyPayload = serializeResponse(r);
+                if(replyPayload == null) {
+                    logger.error("Unable to serialize response");
+                    sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+                    return;
+                }
+                var reply = new ProducerRecord<>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
+                                                 record.partition(),
+                                                 record.key(),
+                                                 replyPayload,
+                                                 replyHeaders);
+                replyTemplate.send(reply);
+                logger.info("Sent reply to " + new String(replyTopicHeader.value()));
+            }, throwable -> {
+                if(throwable instanceof CommandExecutionException) {
+                    sendError(record, replyTopicHeader, replyHeaders, ((CommandExecutionException) throwable).getStatus());
+                }
+                else {
+                    sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+                }
+            });
+        } catch (Exception e) {
+            logger.info("An unhandled exception occurred while executing an action {} {}",
+                        e.getClass().getSimpleName(),
+                        e.getMessage());
+            sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
 
+    private void sendError(ConsumerRecord<String, String> record,
+                           Header replyTopicHeader,
+                           ArrayList<Header> replyHeaders,
+                           HttpStatus status) {
+        replyHeaders.add(getErrorHeader(status));
+        var reply = new ProducerRecord<String, String>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
+                                                       record.partition(),
+                                                       record.key(),
+                                                       null, replyHeaders);
+        replyTemplate.send(reply);
+    }
+
+    private RecordHeader getErrorHeader(HttpStatus status) {
+        var errorValue = serializeCommandExecutionException(new CommandExecutionException(status));
+        return new RecordHeader(Headers.ERROR, errorValue.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private UserId getUserIdFromAccessToken(byte[] tokenBytes) {
+        var token = new String(tokenBytes, StandardCharsets.UTF_8);
+        String[] chunks = token.split("\\.");
+        var decoder = Base64.getDecoder();
+        String header = new String(decoder.decode(chunks[0]));
+        String payload = new String(decoder.decode(chunks[1]));
+        return new UserId("JohnSmith");
     }
 
     private Q deserializeRequest(String request) {
@@ -104,5 +161,19 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
             logger.debug("Error while serializing response", e);
             return null;
         }
+    }
+
+    private String serializeCommandExecutionException(CommandExecutionException exception) {
+        try {
+            return objectMapper.writeValueAsString(exception);
+        } catch (JsonProcessingException e) {
+            logger.error("Error while serializing CommandExecutionException", e);
+            return """
+                    {
+                        "status" : 500
+                    }
+                    """.strip();
+        }
+
     }
 }

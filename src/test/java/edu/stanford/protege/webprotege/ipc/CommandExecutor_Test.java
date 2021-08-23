@@ -2,6 +2,7 @@ package edu.stanford.protege.webprotege.ipc;
 
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
+import edu.stanford.protege.webprotege.common.UserId;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,7 +36,7 @@ public class CommandExecutor_Test {
 
     @Test
     void shouldSendAndReceivedCommand() throws IOException, ExecutionException, InterruptedException, TimeoutException {
-        var response = executor.execute(new TestRequest());
+        var response = executor.execute(new TestRequest(), new ExecutionContext(new UserId("JohnSmith")));
         var res = response.get(5000, TimeUnit.SECONDS);
         assertThat(res).isNotNull();
     }

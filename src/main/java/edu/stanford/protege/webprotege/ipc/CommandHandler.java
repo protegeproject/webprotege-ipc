@@ -29,7 +29,8 @@ public interface CommandHandler<Q extends Request<R>, R extends Response> {
     /**
      * Handle a request and return a response
      * @param request
+     * @param executionContext
      * @return
      */
-    Mono<R> handleRequest(Q request);
+    Mono<R> handleRequest(Q request, ExecutionContext executionContext);
 }
