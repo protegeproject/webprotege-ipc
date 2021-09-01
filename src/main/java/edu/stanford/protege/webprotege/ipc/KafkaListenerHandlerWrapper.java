@@ -127,7 +127,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
         var reply = new ProducerRecord<String, String>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
                                                        record.partition(),
                                                        record.key(),
-                                                       null, replyHeaders);
+                                                       status.getReasonPhrase(), replyHeaders);
         replyTemplate.send(reply);
     }
 
@@ -149,7 +149,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
         try {
             return objectMapper.readValue(request, commandHandler.getRequestClass());
         } catch (JsonProcessingException e) {
-            logger.debug("Error while deserializing request", e);
+            logger.error("Error while deserializing request", e);
             return null;
         }
     }
@@ -158,7 +158,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
         try {
             return objectMapper.writeValueAsString(response);
         } catch (JsonProcessingException e) {
-            logger.debug("Error while serializing response", e);
+            logger.error("Error while serializing response", e);
             return null;
         }
     }
