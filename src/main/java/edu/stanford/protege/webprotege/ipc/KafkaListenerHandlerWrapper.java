@@ -49,8 +49,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
     }
 
     public void handleMessage(final ConsumerRecord<String, String> record) {
-
-        logger.info("Handling message: " + record.value());
+        logger.info("Handling message: {}", record.headers());
         var inboundHeaders = record.headers();
         var replyHeaders = new ArrayList<Header>();
 
