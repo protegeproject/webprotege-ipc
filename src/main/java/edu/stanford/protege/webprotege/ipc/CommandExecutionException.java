@@ -1,5 +1,8 @@
 package edu.stanford.protege.webprotege.ipc;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIncludeProperties;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -7,15 +10,26 @@ import org.springframework.http.HttpStatus;
  * Stanford Center for Biomedical Informatics Research
  * 2021-08-23
  */
+@JsonIncludeProperties("statusCode")
 public class CommandExecutionException extends RuntimeException {
 
-    private final HttpStatus status;
+    private final int statusCode;
 
     public CommandExecutionException(HttpStatus status) {
-        this.status = status;
+        this.statusCode = status.value();
     }
 
+    @JsonCreator
+    public CommandExecutionException(int statusCode) {
+        this.statusCode = statusCode;
+    }
+
+    public int getStatusCode() {
+        return statusCode;
+    }
+
+    @JsonIgnore
     public HttpStatus getStatus() {
-        return status;
+        return HttpStatus.resolve(statusCode);
     }
 }

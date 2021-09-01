@@ -73,6 +73,10 @@ public class CommandExecutor_Test {
         public String getChannel() {
             return "TestRequest";
         }
+
+        public int getId() {
+            return 3;
+        }
     }
 
     private static class TestResponse implements Response {
