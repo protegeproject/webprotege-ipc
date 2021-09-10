@@ -110,6 +110,12 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
                     sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
             });
+        } catch (CommandExecutionException e) {
+            logger.info("An unhandled exception occurred while executing an action {} {}",
+                        e.getClass().getSimpleName(),
+                        e.getMessage());
+            sendError(record, replyTopicHeader, replyHeaders, e.getStatus());
+
         } catch (Exception e) {
             logger.info("An unhandled exception occurred while executing an action {} {}",
                         e.getClass().getSimpleName(),
@@ -169,7 +175,7 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
             logger.error("Error while serializing CommandExecutionException", e);
             return """
                     {
-                        "status" : 500
+                        "statusCode" : 500
                     }
                     """.strip();
         }

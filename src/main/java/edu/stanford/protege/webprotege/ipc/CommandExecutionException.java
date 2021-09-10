@@ -32,4 +32,9 @@ public class CommandExecutionException extends RuntimeException {
     public HttpStatus getStatus() {
         return HttpStatus.resolve(statusCode);
     }
+
+    @Override
+    public String getMessage() {
+        return "HTTP Error " + statusCode + " (" + getStatus().getReasonPhrase() + ")";
+    }
 }
