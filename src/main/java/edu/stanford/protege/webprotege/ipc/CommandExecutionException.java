@@ -3,6 +3,7 @@ package edu.stanford.protege.webprotege.ipc;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIncludeProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.http.HttpStatus;
 
 /**
@@ -20,7 +21,7 @@ public class CommandExecutionException extends RuntimeException {
     }
 
     @JsonCreator
-    public CommandExecutionException(int statusCode) {
+    public CommandExecutionException(@JsonProperty("statusCode") int statusCode) {
         this.statusCode = statusCode;
     }
 
