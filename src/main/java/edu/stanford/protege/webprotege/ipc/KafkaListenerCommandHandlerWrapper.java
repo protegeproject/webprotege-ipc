@@ -17,9 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Base64;
-import java.util.List;
 
 import static org.springframework.kafka.support.KafkaHeaders.*;
 
@@ -28,11 +26,11 @@ import static org.springframework.kafka.support.KafkaHeaders.*;
  * Stanford Center for Biomedical Informatics Research
  * 2021-08-06
  */
-public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Response> {
+public class KafkaListenerCommandHandlerWrapper<Q extends Request<R>, R extends Response> {
 
     public static final String METHOD_NAME = "handleMessage";
 
-    private static final Logger logger = LoggerFactory.getLogger(KafkaListenerHandlerWrapper.class);
+    private static final Logger logger = LoggerFactory.getLogger(KafkaListenerCommandHandlerWrapper.class);
 
     private final KafkaTemplate<String, String> replyTemplate;
 
@@ -40,16 +38,15 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
 
     private final CommandHandler<Q, R> commandHandler;
 
-    public KafkaListenerHandlerWrapper(KafkaTemplate<String, String> replyTemplate,
-                                       ObjectMapper objectMapper,
-                                       CommandHandler<Q, R> commandHandler) {
+    public KafkaListenerCommandHandlerWrapper(KafkaTemplate<String, String> replyTemplate,
+                                              ObjectMapper objectMapper,
+                                              CommandHandler<Q, R> commandHandler) {
         this.replyTemplate = replyTemplate;
         this.objectMapper = objectMapper;
         this.commandHandler = commandHandler;
     }
 
     public void handleMessage(final ConsumerRecord<String, String> record) {
-        logger.info("Handling message: {}", record.headers());
         var inboundHeaders = record.headers();
         var replyHeaders = new ArrayList<Header>();
 
@@ -129,10 +126,11 @@ public class KafkaListenerHandlerWrapper<Q extends Request<R>, R extends Respons
                            ArrayList<Header> replyHeaders,
                            HttpStatus status) {
         replyHeaders.add(getErrorHeader(status));
-        var reply = new ProducerRecord<String, String>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
-                                                       record.partition(),
-                                                       record.key(),
-                                                       status.getReasonPhrase(), replyHeaders);
+        var reply = new ProducerRecord<>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
+                                         record.partition(),
+                                         record.key(),
+                                         status.getReasonPhrase(),
+                                         replyHeaders);
         replyTemplate.send(reply);
     }
 
