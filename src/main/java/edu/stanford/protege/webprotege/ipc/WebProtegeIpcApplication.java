@@ -1,6 +1,8 @@
 package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusRequest;
+import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusResponse;
 import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
@@ -41,4 +43,8 @@ public class WebProtegeIpcApplication {
 		return new EventDispatcher(kafkaTemplate, objectMapper);
 	}
 
+	@Bean
+	CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> executorForGetAuthorizationStatusRequest() {
+		return new CommandExecutor<>(GetAuthorizationStatusResponse.class);
+	}
 }

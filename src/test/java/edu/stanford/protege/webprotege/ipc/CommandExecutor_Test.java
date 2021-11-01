@@ -36,7 +36,8 @@ public class CommandExecutor_Test {
 
     @Test
     void shouldSendAndReceivedCommand() throws IOException, ExecutionException, InterruptedException, TimeoutException {
-        var response = executor.execute(new TestRequest(), new ExecutionContext(new UserId("JohnSmith")));
+        var response = executor.execute(new TestRequest(), new ExecutionContext(new UserId("JohnSmith"),
+                                                                                "access-token-value"));
         var res = response.get(5000, TimeUnit.SECONDS);
         assertThat(res).isNotNull();
     }

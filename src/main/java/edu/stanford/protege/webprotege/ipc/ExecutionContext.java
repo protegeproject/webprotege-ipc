@@ -7,9 +7,9 @@ import edu.stanford.protege.webprotege.common.UserId;
  * Stanford Center for Biomedical Informatics Research
  * 2021-08-19
  */
-public record ExecutionContext(UserId userId) {
+public record ExecutionContext(UserId userId, String jwt) {
 
     public ExecutionContext() {
-        this(UserId.getGuest());
+        this(UserId.getGuest(), "");
     }
 }

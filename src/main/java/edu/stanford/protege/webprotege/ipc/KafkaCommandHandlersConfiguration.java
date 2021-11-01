@@ -1,6 +1,8 @@
 package edu.stanford.protege.webprotege.ipc;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusRequest;
+import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;
@@ -49,7 +51,8 @@ public class KafkaCommandHandlersConfiguration implements KafkaListenerConfigure
     @Autowired
     private ObjectMapper objectMapper;
 
-
+    @Autowired
+    private CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
     @Override
     public void configureKafkaListeners(KafkaListenerEndpointRegistrar registrar) {
@@ -67,7 +70,7 @@ public class KafkaCommandHandlersConfiguration implements KafkaListenerConfigure
 
     private MethodKafkaListenerEndpoint<String, String> createListenerEndpoint(final CommandHandler<?,?> handler,
                                                                                final Method listenerMethod) {
-        var listener = new KafkaListenerCommandHandlerWrapper<>(replyTemplate, objectMapper, handler);
+        var listener = new KafkaListenerCommandHandlerWrapper<>(replyTemplate, objectMapper, handler, authorizationStatusExecutor);
 
         var endpoint = new MethodKafkaListenerEndpoint<String, String>();
         endpoint.setBeanFactory(beanFactory);
