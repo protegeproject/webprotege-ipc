@@ -39,7 +39,7 @@ public class ReplyingKafkaTemplateFactoryImpl implements ReplyingKafkaTemplateFa
         container.getContainerProperties().setGroupId(applicationName + "-" + replyingTopic + "-consumer");
         var template = new ReplyingKafkaTemplate<>(producerFactory, container);
         template.setSharedReplyTopic(true);
-        template.setDefaultReplyTimeout(Duration.of(1, ChronoUnit.MINUTES));
+        template.setDefaultReplyTimeout(Duration.of(5, ChronoUnit.MINUTES));
         template.setReplyErrorChecker(replyErrorChecker);
         return template;
     }
