@@ -73,20 +73,21 @@ public class KafkaListenerCommandHandlerWrapper<Q extends Request<R>, R extends 
 
         var userIdHeader = inboundHeaders.lastHeader(Headers.USER_ID);
         if (userIdHeader == null) {
-            logger.error(Headers.USER_ID + " header is missing.  Cannot process message.  Treating as unauthorized.");
+            logger.error(Headers.USER_ID + " header is missing.  Cannot process message.  Treating as unauthorized.  Message reply topic: {}",
+                         new String(replyTopicHeader.value(), StandardCharsets.UTF_8));
             sendError(record, replyTopicHeader, replyHeaders, HttpStatus.UNAUTHORIZED);
             return;
         }
 
-        var accessToken = inboundHeaders.lastHeader(Headers.ACCESS_TOKEN);
-        if (accessToken == null) {
-            logger.error(Headers.ACCESS_TOKEN + " header is missing.  Cannot process message.  Treating as unauthorized.");
-            sendError(record, replyTopicHeader, replyHeaders, HttpStatus.UNAUTHORIZED);
-            return;
-        }
+        //        var accessToken = inboundHeaders.lastHeader(Headers.ACCESS_TOKEN);
+        //        if (accessToken == null) {
+        //            logger.error(Headers.ACCESS_TOKEN + " header is missing.  Cannot process message.  Treating as unauthorized.  Message reply topic: {}", new String(replyTopicHeader.value(), StandardCharsets.UTF_8));
+        //            sendError(record, replyTopicHeader, replyHeaders, HttpStatus.UNAUTHORIZED);
+        //            return;
+        //        }
 
         replyHeaders.add(new RecordHeader(Headers.USER_ID, userIdHeader.value()));
-        replyHeaders.add(new RecordHeader(Headers.ACCESS_TOKEN, accessToken.value()));
+        //        replyHeaders.add(new RecordHeader(Headers.ACCESS_TOKEN, accessToken.value()));
 
 
         var payload = record.value();
@@ -98,11 +99,11 @@ public class KafkaListenerCommandHandlerWrapper<Q extends Request<R>, R extends 
             return;
         }
         var userId = new UserId(new String(userIdHeader.value(), StandardCharsets.UTF_8));
-        var jwt = new String(accessToken.value(), StandardCharsets.UTF_8);
+        //        var jwt = new String(accessToken.value(), StandardCharsets.UTF_8);
 
-        verifyJwt(jwt);
+        //        verifyJwt(jwt);
 
-        var executionContext = new ExecutionContext(userId, jwt);
+        var executionContext = new ExecutionContext(userId, "");
 
         // Check authorized
         if (commandHandler instanceof AuthorizedCommandHandler<Q, R> authenticatingCommandHandler) {
@@ -112,15 +113,30 @@ public class KafkaListenerCommandHandlerWrapper<Q extends Request<R>, R extends 
             // Call to the authorization service to check
             var statusResponse = executor.execute(new GetAuthorizationStatusRequest(resource,
                                                                                     subject,
-                                                                                    requiredActionId.stream().findFirst().orElse(null)),
+                                                                                    requiredActionId.stream()
+                                                                                                    .findFirst()
+                                                                                                    .orElse(null)),
                                                   executionContext);
             statusResponse.whenComplete((r, e) -> {
-                if (r.authorizationStatus() == AuthorizationStatus.AUTHORIZED) {
-                    handleAuthorizedRequest(record, replyHeaders, replyTopicHeader, request, executionContext);
+                if (e != null) {
+                    logger.warn("An error occurred when requesting the authorization status for {} on {}. Error: {}",
+                                userId,
+                                resource,
+                                e.getMessage());
+                    sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
                 }
                 else {
-                    sendError(record, replyTopicHeader, replyHeaders, HttpStatus.FORBIDDEN);
+                    if (r.authorizationStatus() == AuthorizationStatus.AUTHORIZED) {
+                        handleAuthorizedRequest(record, replyHeaders, replyTopicHeader, request, executionContext);
+                    }
+                    else {
+                        logger.info("Permission denied when attempting to execute a request.  User: {}, Request: {}",
+                                    userId,
+                                    request);
+                        sendError(record, replyTopicHeader, replyHeaders, HttpStatus.FORBIDDEN);
+                    }
                 }
+
             });
         }
         else {
@@ -133,45 +149,41 @@ public class KafkaListenerCommandHandlerWrapper<Q extends Request<R>, R extends 
                                          Header replyTopicHeader,
                                          Q request,
                                          ExecutionContext executionContext) {
-        try {
-            Mono<R> response = commandHandler.handleRequest(request, executionContext);
-            response.subscribe(r -> {
-                var replyPayload = serializeResponse(r);
-                if (replyPayload == null) {
-                    logger.error("Unable to serialize response");
-                    sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
-                    return;
-                }
-                var reply = new ProducerRecord<>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
-                                                 record.partition(),
-                                                 record.key(),
-                                                 replyPayload,
-                                                 replyHeaders);
-                replyTemplate.send(reply);
-                logger.info("Sent reply to " + new String(replyTopicHeader.value()));
-            }, throwable -> {
-                if (throwable instanceof CommandExecutionException) {
-                    sendError(record,
-                              replyTopicHeader,
-                              replyHeaders,
-                              ((CommandExecutionException) throwable).getStatus());
-                }
-                else {
-                    sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
-                }
-            });
-        } catch (CommandExecutionException e) {
-            logger.info("An unhandled exception occurred while executing an action {} {}",
-                        e.getClass().getSimpleName(),
-                        e.getMessage());
-            sendError(record, replyTopicHeader, replyHeaders, e.getStatus());
-
-        } catch (Exception e) {
-            logger.info("An unhandled exception occurred while executing an action {} {}",
-                        e.getClass().getSimpleName(),
-                        e.getMessage());
-            sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        Mono<R> response = commandHandler.handleRequest(request, executionContext);
+        response.subscribe(r -> {
+            var replyPayload = serializeResponse(r);
+            if (replyPayload == null) {
+                logger.error("Unable to serialize response");
+                sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+                return;
+            }
+            var reply = new ProducerRecord<>(new String(replyTopicHeader.value(), StandardCharsets.UTF_8),
+                                             record.partition(),
+                                             record.key(),
+                                             replyPayload,
+                                             replyHeaders);
+            replyTemplate.send(reply);
+            logger.info("Sent reply to " + new String(replyTopicHeader.value()));
+        }, throwable -> {
+            if (throwable instanceof CommandExecutionException ex) {
+                logger.info(
+                        "The command handler threw a CommandExecutionException exception while handling a request.  Sending an error as the reply to {}.  Code: {}, Message: {},  Request: {}",
+                        new String(replyTopicHeader.value()),
+                        ex.getStatusCode(),
+                        throwable.getMessage(),
+                        request);
+                sendError(record, replyTopicHeader, replyHeaders, ex.getStatus());
+            }
+            else {
+                logger.info(
+                        "The command handler threw an exception while handling a request.  Sending an error as the reply to {}.  Exception class: {}, Message: {},  Request: {}",
+                        new String(replyTopicHeader.value()),
+                        throwable.getClass().getName(),
+                        throwable.getMessage(),
+                        request);
+                sendError(record, replyTopicHeader, replyHeaders, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+        });
     }
 
     private void sendError(ConsumerRecord<String, String> record,
@@ -225,26 +237,26 @@ public class KafkaListenerCommandHandlerWrapper<Q extends Request<R>, R extends 
     }
 
     private void verifyJwt(String token) {
-//        try {
-//            DecodedJWT jwt = JWT.decode(token);
-//
-//            // check JWT is valid
-//            Jwk jwk = jwtService.getJwk();
-//            Algorithm algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey(), null);
-//
-//            algorithm.verify(jwt);
-//
-//            // check JWT is still active
-//            Date expiryDate = jwt.getExpiresAt();
-//            if (expiryDate.before(new Date())) {
-//                throw new Exception("token is expired");
-//            }
-//
-//
-//        } catch (Exception e) {
-//            logger.error("exception : {} ", e.getMessage());
-//            throw new RuntimeException();
-//        }
+        //        try {
+        //            DecodedJWT jwt = JWT.decode(token);
+        //
+        //            // check JWT is valid
+        //            Jwk jwk = jwtService.getJwk();
+        //            Algorithm algorithm = Algorithm.RSA256((RSAPublicKey) jwk.getPublicKey(), null);
+        //
+        //            algorithm.verify(jwt);
+        //
+        //            // check JWT is still active
+        //            Date expiryDate = jwt.getExpiresAt();
+        //            if (expiryDate.before(new Date())) {
+        //                throw new Exception("token is expired");
+        //            }
+        //
+        //
+        //        } catch (Exception e) {
+        //            logger.error("exception : {} ", e.getMessage());
+        //            throw new RuntimeException();
+        //        }
         return;
     }
 }
