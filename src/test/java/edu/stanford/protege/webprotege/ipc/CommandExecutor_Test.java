@@ -9,7 +9,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.test.annotation.DirtiesContext;
 
 import java.io.IOException;
 import java.util.concurrent.ExecutionException;
@@ -24,6 +26,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 2021-08-03
  */
 @SpringBootTest
+@DirtiesContext
+@EmbeddedKafka(partitions = 1, brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" })
 public class CommandExecutor_Test {
 
     @Autowired
