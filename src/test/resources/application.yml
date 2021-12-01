@@ -1,6 +1,6 @@
 spring:
   application:
-    name: TestService
+    name: WebProtegeIpcTests
   kafka:
     consumer:
       auto-offset-reset: earliest
