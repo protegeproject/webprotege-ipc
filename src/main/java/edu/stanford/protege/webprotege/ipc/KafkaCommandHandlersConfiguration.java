@@ -16,6 +16,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.messaging.handler.annotation.support.DefaultMessageHandlerMethodFactory;
 import org.springframework.messaging.handler.annotation.support.MessageHandlerMethodFactory;
 
+import javax.annotation.PostConstruct;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -53,6 +54,13 @@ public class KafkaCommandHandlersConfiguration implements KafkaListenerConfigure
 
     @Autowired
     private CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
+
+    @PostConstruct
+    private void postConstruct() {
+        logger.info("Command handlers configuration:");
+        commandHandlers.forEach(handler -> logger.info("Auto-detected command handler {} for channel {}", handler.getClass().getName(), handler.getChannelName()));
+    }
+
 
     @Override
     public void configureKafkaListeners(KafkaListenerEndpointRegistrar registrar) {
