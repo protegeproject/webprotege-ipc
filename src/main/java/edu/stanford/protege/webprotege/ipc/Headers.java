@@ -7,9 +7,13 @@ package edu.stanford.protege.webprotege.ipc;
  */
 public class Headers {
 
-    public static final String ACCESS_TOKEN = "accessToken";
+    private static final String PREFIX = "webprotege_";
 
-    public static final String USER_ID = "webprotege_userId";
+    public static final String USER_ID = PREFIX + "userId";
 
-    public static final String ERROR = "webprotege_error";
+    public static final String ERROR = PREFIX + "error";
+
+    public static final String EVENT_TYPE = PREFIX + "eventType";
+
+    public static final String PROJECT_ID = PREFIX + "projectId";
 }
