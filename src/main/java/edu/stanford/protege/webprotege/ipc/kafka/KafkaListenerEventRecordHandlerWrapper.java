@@ -1,8 +1,9 @@
-package edu.stanford.protege.webprotege.ipc;
+package edu.stanford.protege.webprotege.ipc.kafka;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.ProjectId;
+import edu.stanford.protege.webprotege.ipc.EventRecord;
+import edu.stanford.protege.webprotege.ipc.EventRecordHandler;
+import edu.stanford.protege.webprotege.ipc.Headers;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

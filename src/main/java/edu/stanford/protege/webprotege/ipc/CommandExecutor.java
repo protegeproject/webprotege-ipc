@@ -4,14 +4,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
+import edu.stanford.protege.webprotege.ipc.kafka.ReplyingKafkaTemplateFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 import org.springframework.messaging.support.MessageBuilder;
 
-import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 
 import static org.springframework.kafka.support.KafkaHeaders.REPLY_TOPIC;
 import static org.springframework.kafka.support.KafkaHeaders.TOPIC;

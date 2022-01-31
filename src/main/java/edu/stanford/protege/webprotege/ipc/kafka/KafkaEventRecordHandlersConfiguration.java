@@ -1,6 +1,8 @@
-package edu.stanford.protege.webprotege.ipc;
+package edu.stanford.protege.webprotege.ipc.kafka;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.ipc.EventDispatcher;
+import edu.stanford.protege.webprotege.ipc.EventRecordHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.BeanFactory;

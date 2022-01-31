@@ -1,5 +1,6 @@
-package edu.stanford.protege.webprotege.ipc;
+package edu.stanford.protege.webprotege.ipc.kafka;
 
+import edu.stanford.protege.webprotege.ipc.ReplyErrorChecker;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ProducerFactory;
@@ -7,7 +8,6 @@ import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import java.util.UUID;
 
 /**
  * Matthew Horridge

@@ -1,4 +1,4 @@
-package edu.stanford.protege.webprotege.ipc;
+package edu.stanford.protege.webprotege.ipc.kafka;
 
 import org.springframework.kafka.requestreply.ReplyingKafkaTemplate;
 
