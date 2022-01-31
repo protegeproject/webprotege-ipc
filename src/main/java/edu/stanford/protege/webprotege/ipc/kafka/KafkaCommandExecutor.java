@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
+import edu.stanford.protege.webprotege.ipc.CommandExecutor;
 import edu.stanford.protege.webprotege.ipc.ExecutionContext;
 import edu.stanford.protege.webprotege.ipc.Headers;
 import edu.stanford.protege.webprotege.ipc.MessageChannelMapper;
@@ -22,9 +23,7 @@ import static org.springframework.kafka.support.KafkaHeaders.TOPIC;
  * Stanford Center for Biomedical Informatics Research
  * 2022-01-31
  */
-public class KafkaCommandExecutor<Q extends Request<R>, R extends Response> {
-
-
+public class KafkaCommandExecutor<Q extends Request<R>, R extends Response> implements CommandExecutor<Q, R> {
 
     private ReplyingKafkaTemplate<String, String, String> template = null;
 

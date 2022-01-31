@@ -3,6 +3,7 @@ package edu.stanford.protege.webprotege.ipc;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.common.UserId;
+import edu.stanford.protege.webprotege.ipc.kafka.KafkaCommandExecutor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -55,7 +56,7 @@ public class CommandExecutor_Test {
          */
         @Bean
         CommandExecutor<TestRequest, TestResponse> commandExecutor() {
-            return new CommandExecutor<>(TestResponse.class);
+            return new KafkaCommandExecutor<>(TestResponse.class);
         }
 
         /**
