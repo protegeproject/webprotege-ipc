@@ -5,6 +5,7 @@ import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusReque
 import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusResponse;
 import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
 import edu.stanford.protege.webprotege.ipc.kafka.KafkaCommandExecutor;
+import edu.stanford.protege.webprotege.ipc.kafka.KafkaEventDispatcher;
 import edu.stanford.protege.webprotege.ipc.kafka.ReplyingKafkaTemplateFactory;
 import edu.stanford.protege.webprotege.ipc.kafka.ReplyingKafkaTemplateFactoryImpl;
 import org.springframework.beans.factory.annotation.Value;
@@ -43,7 +44,7 @@ public class WebProtegeIpcApplication {
 
 	@Bean
 	EventDispatcher eventDispatcher(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
-		return new EventDispatcher(kafkaTemplate, objectMapper);
+		return new KafkaEventDispatcher(kafkaTemplate, objectMapper);
 	}
 
 	@Bean
