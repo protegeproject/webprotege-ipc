@@ -9,6 +9,10 @@ public class Headers {
 
     private static final String PREFIX = "webprotege_";
 
+    public static final String REPLY_CHANNEL = PREFIX + "replyChannel";
+
+    public static final String CORRELATION_ID = PREFIX + "correlationId";
+
     public static final String USER_ID = PREFIX + "userId";
 
     public static final String ERROR = PREFIX + "error";
