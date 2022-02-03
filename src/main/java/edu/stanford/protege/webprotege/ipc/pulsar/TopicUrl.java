@@ -10,4 +10,8 @@ public class TopicUrl {
     public static String getCommandTopicUrl(String channel) {
         return "persistent://webprotege/commands/" + channel;
     }
+
+    public static String getEventTopicUrl(String channel) {
+        return "persistent://webprotege/events/" + channel;
+    }
 }

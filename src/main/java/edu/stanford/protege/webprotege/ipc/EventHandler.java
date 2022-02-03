@@ -20,7 +20,7 @@ public interface EventHandler<E extends Event> {
     String getChannelName();
 
     /**
-     * Gets the name of this handler.  Handler names are used to form group names for Kafka listeners.
+     * Gets the name of this handler.  Handler names are used to form group names for listeners.
      * Handler names should be determined by the usage context of the handler.  For a given context they
      * should be the same over different runs of the application (in other words, handler names should not
      * be randomly created on a run).
