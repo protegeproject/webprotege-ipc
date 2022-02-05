@@ -27,7 +27,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @DirtiesContext
-//@EmbeddedKafka(partitions = 1, brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" })
 public class EventDispatcher_TestCase {
 
     public static final String THE_EVENT_ID = "TheEventId";
