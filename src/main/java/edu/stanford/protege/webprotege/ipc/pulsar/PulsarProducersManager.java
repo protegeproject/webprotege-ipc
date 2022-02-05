@@ -49,9 +49,6 @@ public class PulsarProducersManager {
 
     public Producer<byte[]> getProducer(String topicUrl,
                                         java.util.function.Consumer<ProducerBuilder<byte[]>> producerCustomizer) {
-        if(!topicUrl.startsWith("persistent") || !topicUrl.startsWith("non-persistent")) {
-            throw new RuntimeException("Invalid topic URL: " + topicUrl);
-        }
         return cache.get(topicUrl, u -> createProducer(u, producerCustomizer));
     }
 
