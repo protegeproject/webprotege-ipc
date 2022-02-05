@@ -1,17 +1,22 @@
 package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.common.Event;
+import com.fasterxml.jackson.annotation.JsonTypeName;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.common.ProjectEvent;
+import edu.stanford.protege.webprotege.common.ProjectId;
+import org.apache.pulsar.client.api.Consumer;
+import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.kafka.annotation.EnableKafka;
-import org.springframework.kafka.annotation.KafkaListener;
-import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.test.annotation.DirtiesContext;
 
-import java.util.concurrent.CountDownLatch;
+import java.io.IOException;
+import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @SpringBootTest
 @DirtiesContext
-@EmbeddedKafka(partitions = 1, brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" })
+//@EmbeddedKafka(partitions = 1, brokerProperties = { "listeners=PLAINTEXT://localhost:9092", "port=9092" })
 public class EventDispatcher_TestCase {
 
     public static final String THE_EVENT_ID = "TheEventId";
@@ -30,11 +35,31 @@ public class EventDispatcher_TestCase {
     @Autowired
     private EventDispatcher eventDispatcher;
 
-    private static CountDownLatch countDownLatch;
+    private PulsarClient pulsarClient;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    private final ProjectId projectId = ProjectId.generate();
+
+    private Consumer<byte[]> consumer;
 
     @BeforeEach
-    void setUp() {
-        countDownLatch = new CountDownLatch(1);
+    void setUp() throws Exception {
+        pulsarClient = PulsarClient.builder().serviceUrl("http://localhost:8080").build();
+        consumer = pulsarClient.newConsumer()
+                               .topic("webprotege/events/TestEventChannel")
+                               .subscriptionName("test-consumer")
+                               .subscribe();
+        var event = new TestEvent(THE_EVENT_ID, projectId);
+        eventDispatcher.dispatchEvent(event);
+    }
+
+    @AfterEach
+    void tearDown() throws PulsarClientException {
+        consumer.unsubscribe();
+        consumer.close();
+        pulsarClient.close();
     }
 
     @Test
@@ -43,27 +68,32 @@ public class EventDispatcher_TestCase {
     }
 
     @Test
-    void shouldDispatchEvent() throws InterruptedException {
-        var event = new TestEvent(THE_EVENT_ID);
-        eventDispatcher.dispatchEvent(event);
-        countDownLatch.await();
+    void shouldContainEventTypeHeader() throws IOException {
+        var message = consumer.receive();
+        assertThat(message.getProperty("webprotege_eventType")).isEqualTo("TestEventType");
     }
 
+    @Test
+    void shouldContainProjectIdHeader() throws PulsarClientException {
+        var message = consumer.receive();
+        assertThat(message.getProperty("webprotege_projectId")).isEqualTo(projectId.value());
+    }
 
-    private static record TestEvent(String id) implements Event {
+    @Test
+    void shouldContainBodyWithJsonRepresentation() throws IOException {
+        var message = consumer.receive();
+        var object = objectMapper.readValue(new String(message.getValue()), new TypeReference<Map<String, Object>>() {});
+        assertThat(object).containsEntry("id", THE_EVENT_ID);
+        assertThat(object).containsEntry("projectId", projectId.value());
+    }
+
+    @JsonTypeName("TestEventType")
+    private static record TestEvent(String id,
+                                    ProjectId projectId) implements ProjectEvent {
 
         @Override
         public String getChannel() {
             return "TestEventChannel";
-        }
-    }
-
-    @TestConfiguration
-    static class Config {
-
-        @KafkaListener(topics = "TestEventChannel")
-        void handleEvent(String event) {
-            countDownLatch.countDown();
         }
     }
 }

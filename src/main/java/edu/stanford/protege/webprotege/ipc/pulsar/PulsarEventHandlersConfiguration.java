@@ -1,6 +1,7 @@
 package edu.stanford.protege.webprotege.ipc.pulsar;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.ipc.EventHandler;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.slf4j.Logger;
@@ -13,6 +14,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
 
 import javax.annotation.PostConstruct;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -25,8 +27,8 @@ public class PulsarEventHandlersConfiguration {
 
     private static Logger logger = LoggerFactory.getLogger(PulsarEventHandlersConfiguration.class);
 
-    @Autowired
-    private List<EventHandler<?>> eventHandlers;
+    @Autowired(required = false)
+    private List<EventHandler<? extends Event>> eventHandlers = new ArrayList<>();
 
     @Autowired
     PulsarEventHandlerWrapperFactory wrapperFactory;
