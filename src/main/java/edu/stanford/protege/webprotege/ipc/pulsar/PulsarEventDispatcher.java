@@ -35,12 +35,16 @@ public class PulsarEventDispatcher implements EventDispatcher {
 
     private final ObjectMapper objectMapper;
 
+    private final String tenant;
+
     public PulsarEventDispatcher(@Value("${spring.application.name}") String applicationName,
                                  PulsarProducersManager producersManager,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper,
+                                 @Value("${webprotege.pulsar.tenant}") String tenant) {
         this.applicationName = applicationName;
         this.producersManager = producersManager;
         this.objectMapper = objectMapper;
+        this.tenant = tenant;
     }
 
     @Override
@@ -49,7 +53,7 @@ public class PulsarEventDispatcher implements EventDispatcher {
     }
 
     private void createProducerAndDispatchEvent(Event event) {
-        var eventTopicUrl = TopicUrl.getEventTopicUrl(event.getChannel());
+        var eventTopicUrl = tenant + "/" + PulsarNamespaces.EVENTS + "/" + event.getChannel();
         var producer = producersManager.getProducer(eventTopicUrl, producerBuilder -> {
             producerBuilder.producerName(getProducerName(event));
         });

@@ -30,14 +30,16 @@ public class PulsarEventHandlerWrapper<E extends Event> implements Closeable {
 
     private Consumer<byte[]> consumer;
 
-    public PulsarEventHandlerWrapper(String applicationName,
-                                     EventHandler<E> eventHandler,
+    private final String tenant;
+
+    public PulsarEventHandlerWrapper(String applicationName, String tenant, EventHandler<E> eventHandler,
                                      ObjectMapper objectMapper,
                                      PulsarClient pulsarClient) {
         this.applicationName = applicationName;
         this.eventHandler = eventHandler;
         this.objectMapper = objectMapper;
         this.pulsarClient = pulsarClient;
+        this.tenant = tenant;
     }
 
     public void subscribe() {
@@ -46,7 +48,7 @@ public class PulsarEventHandlerWrapper<E extends Event> implements Closeable {
             return;
         }
         try {
-            var eventTopicUrl = TopicUrl.getEventTopicUrl(eventHandler.getChannelName());
+            var eventTopicUrl = tenant + "/" + PulsarNamespaces.EVENTS + "/" + eventHandler.getChannelName();
             var subscriptionName = getSubscriptionName();
             consumer = pulsarClient.newConsumer()
                                    .subscriptionName(subscriptionName)

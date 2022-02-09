@@ -1,7 +1,0 @@
-spring:
-  application:
-    name: WebProtegeIpcTests
-  kafka:
-    consumer:
-      auto-offset-reset: earliest
-      group-id: ${spring.application.name}

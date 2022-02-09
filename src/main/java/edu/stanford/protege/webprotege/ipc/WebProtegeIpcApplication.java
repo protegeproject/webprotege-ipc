@@ -7,41 +7,25 @@ import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusRespo
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.common.WebProtegeCommonConfiguration;
-import edu.stanford.protege.webprotege.ipc.kafka.KafkaCommandExecutor;
-import edu.stanford.protege.webprotege.ipc.kafka.KafkaEventDispatcher;
-import edu.stanford.protege.webprotege.ipc.kafka.ReplyingKafkaTemplateFactory;
-import edu.stanford.protege.webprotege.ipc.kafka.ReplyingKafkaTemplateFactoryImpl;
-import edu.stanford.protege.webprotege.ipc.pulsar.PulsarCommandHandlerWrapper;
-import edu.stanford.protege.webprotege.ipc.pulsar.PulsarCommandHandlerWrapperFactory;
-import edu.stanford.protege.webprotege.ipc.pulsar.PulsarEventDispatcher;
-import edu.stanford.protege.webprotege.ipc.pulsar.PulsarProducersManager;
+import edu.stanford.protege.webprotege.ipc.pulsar.*;
 import org.apache.pulsar.client.admin.PulsarAdmin;
-import org.apache.pulsar.client.admin.PulsarAdminBuilder;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.admin.internal.PulsarAdminBuilderImpl;
-import org.apache.pulsar.client.admin.internal.PulsarAdminImpl;
-import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
-import org.apache.pulsar.client.impl.conf.ClientConfigurationData;
 import org.apache.pulsar.common.policies.data.TenantInfoImpl;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.autoconfigure.cache.CacheProperties;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Scope;
-import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.core.ProducerFactory;
-
-import java.io.UncheckedIOException;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -50,8 +34,16 @@ import java.util.concurrent.TimeUnit;
 @EnableCaching
 public class WebProtegeIpcApplication {
 
-	@Autowired
-	private PulsarAdmin pulsarAdmin;
+	private static final Logger logger = LoggerFactory.getLogger(WebProtegeIpcApplication.class);
+
+	@Value("${webprotege.pulsar.tenant}")
+	private String tenant;
+
+	@Value("${webprotege.pulsar.serviceHttpUrl}")
+	private String serviceHttpUrl;
+
+	@Value("${webprotege.pulsar.serviceUrl}")
+	private String pulsarServiceUrl;
 
 	public static void main(String[] args) {
 		SpringApplication.run(WebProtegeIpcApplication.class, args);
@@ -68,44 +60,52 @@ public class WebProtegeIpcApplication {
 	}
 
 	@Bean
-    ReplyingKafkaTemplateFactory replyingKafkaTemplateFactory(ConcurrentKafkaListenerContainerFactory<String, String> containerFactory,
-                                                              ProducerFactory<String, String> producerFactory,
-                                                              ReplyErrorChecker replyErrorChecker) {
-		return new ReplyingKafkaTemplateFactoryImpl(containerFactory, producerFactory, replyErrorChecker);
-	}
-
-	@Bean
 	EventDispatcher eventDispatcher(@Value("${spring.application.name}") String applicationName,
 									PulsarProducersManager pulsarProducersManager, ObjectMapper objectMapper) {
-		return new PulsarEventDispatcher(applicationName, pulsarProducersManager, objectMapper);
+		return new PulsarEventDispatcher(applicationName, pulsarProducersManager, objectMapper, tenant);
 	}
 
 	@Bean
-	KafkaCommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> executorForGetAuthorizationStatusRequest() {
-		return new KafkaCommandExecutor<>(GetAuthorizationStatusResponse.class);
+	PulsarCommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> executorForGetAuthorizationStatusRequest() {
+		return new PulsarCommandExecutor<>(GetAuthorizationStatusResponse.class);
 	}
 
 	@Bean
 	PulsarAdmin pulsarAdmin() {
 		try {
 			var admin = new PulsarAdminBuilderImpl()
-					.serviceHttpUrl("http://localhost:8080")
+					.serviceHttpUrl(serviceHttpUrl)
 					.build();
-			if(!admin.tenants().getTenants().contains("webprotege")) {
-				admin.tenants().createTenant("webprotege", new TenantInfoImpl(Set.of("admin"), Set.of("standalone")));
-				admin.namespaces().createNamespace("webprotege/events");
-				admin.namespaces().createNamespace("webprotege/commands");
-			}
+			createTenantIfNecessary(admin);
+			createNamespaceIfNecessary(admin, PulsarNamespaces.COMMAND_REQUESTS);
+			createNamespaceIfNecessary(admin, PulsarNamespaces.COMMAND_REPLIES);
+			createNamespaceIfNecessary(admin, PulsarNamespaces.EVENTS);
 			return admin;
 		} catch (PulsarClientException | PulsarAdminException e) {
 			throw new RuntimeException(e);
 		}
 	}
 
+	private void createTenantIfNecessary(PulsarAdmin admin) throws PulsarAdminException {
+		if(!admin.tenants().getTenants().contains(tenant)) {
+			logger.info("Creating Pulsar tenant: {}", tenant);
+			admin.tenants().createTenant(tenant,
+										 new TenantInfoImpl(Set.of("admin"), Set.of("standalone")));
+		}
+	}
+
+	private void createNamespaceIfNecessary(PulsarAdmin admin, String namespace) throws PulsarAdminException {
+		var namespaceName = tenant + "/" + namespace;
+		if(!admin.namespaces().getNamespaces(tenant).contains(namespaceName)) {
+			logger.info("Creating Pulsar namespace: {}", namespaceName);
+			admin.namespaces().createNamespace(namespaceName);
+		}
+	}
+
 	@Bean
 	PulsarClient pulsarClient() throws PulsarClientException {
 		return PulsarClient.builder()
-						   .serviceUrl("pulsar://localhost:6650").build();
+						   .serviceUrl(pulsarServiceUrl).build();
 	}
 
 	@Bean
@@ -144,6 +144,7 @@ public class WebProtegeIpcApplication {
 			PulsarProducersManager producersManager,
 			CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
 		return new PulsarCommandHandlerWrapper<>(applicationName,
+												 tenant,
 												 pulsarClient,
 												 handler,
 												 objectMapper,

@@ -48,8 +48,9 @@ public class PulsarEventHandlersConfiguration {
     @Bean
     PulsarEventHandlerWrapperFactory pulsarEventHandlerWrapperFactory(@Value("${spring.application.name}") String applicationName,
                                                                       ObjectMapper objectMapper,
-                                                                      PulsarClient pulsarClient) {
-        return handler -> pulsarEventHandlerWrapper(handler, applicationName, objectMapper, pulsarClient);
+                                                                      PulsarClient pulsarClient,
+                                                                      @Value("${webprotege.pulsar.tenant}") String tenant) {
+        return handler -> pulsarEventHandlerWrapper(handler, applicationName, objectMapper, pulsarClient, tenant);
     }
 
     @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
@@ -57,7 +58,8 @@ public class PulsarEventHandlersConfiguration {
     @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     public PulsarEventHandlerWrapper<?> pulsarEventHandlerWrapper(EventHandler<?> handler,
                                                                   String applicationName,
-                                                                  ObjectMapper objectMapper, PulsarClient pulsarClient) {
-        return new PulsarEventHandlerWrapper<>(applicationName, handler, objectMapper, pulsarClient);
+                                                                  ObjectMapper objectMapper, PulsarClient pulsarClient,
+                                                                  @Value("${webprotege.pulsar.tenant}") String tenant) {
+        return new PulsarEventHandlerWrapper<>(applicationName, tenant, handler, objectMapper, pulsarClient);
     }
 }

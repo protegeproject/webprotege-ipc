@@ -29,7 +29,7 @@ import java.util.List;
  * Stanford Center for Biomedical Informatics Research
  * 2021-08-06
  */
-@Configuration
+//@Configuration
 public class KafkaCommandHandlersConfiguration implements KafkaListenerConfigurer {
 
     private static final Logger logger = LoggerFactory.getLogger(KafkaCommandHandlersConfiguration.class);

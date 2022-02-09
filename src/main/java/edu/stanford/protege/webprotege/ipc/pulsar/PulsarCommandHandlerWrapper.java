@@ -16,6 +16,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
@@ -23,8 +24,6 @@ import java.io.UncheckedIOException;
 
 import static edu.stanford.protege.webprotege.ipc.Headers.ERROR;
 import static edu.stanford.protege.webprotege.ipc.Headers.USER_ID;
-import static org.springframework.kafka.support.KafkaHeaders.CORRELATION_ID;
-import static org.springframework.kafka.support.KafkaHeaders.REPLY_TOPIC;
 
 /**
  * Matthew Horridge
@@ -37,6 +36,8 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
 
     private final String applicationName;
 
+    private final String tenant;
+
     private final PulsarClient pulsarClient;
 
     private final CommandHandler<Q, R> handler;
@@ -47,13 +48,17 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
 
     private final CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
+    private Consumer<byte[]> consumer;
+
     public PulsarCommandHandlerWrapper(String applicationName,
+                                       @Value("webprotege.pulsar.tenant") String tenant,
                                        PulsarClient pulsarClient,
                                        CommandHandler<Q, R> handler,
                                        ObjectMapper objectMapper,
                                        PulsarProducersManager producersManager,
                                        CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
         this.applicationName = applicationName;
+        this.tenant = tenant;
         this.pulsarClient = pulsarClient;
         this.handler = handler;
         this.objectMapper = objectMapper;
@@ -61,14 +66,18 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         this.authorizationStatusExecutor = authorizationStatusExecutor;
     }
 
+    public void unsubscribe() {
+
+    }
+
     public void subscribe() {
         try {
-            pulsarClient.newConsumer()
-                        .topic(getTopicUrl(handler))
-                        .subscriptionName(getSubscriptionName(handler))
-                        .consumerName(getConsumerName(handler))
-                        .messageListener(this::handleCommandMessage)
-                        .subscribe();
+            consumer = pulsarClient.newConsumer()
+                                        .topic(getRequestsTopicUrl(handler))
+                                        .subscriptionName(getSubscriptionName(handler))
+                                        .consumerName(getConsumerName(handler))
+                                        .messageListener(this::handleCommandMessage)
+                                        .subscribe();
         } catch (PulsarClientException e) {
             throw new UncheckedIOException(e);
         }
@@ -97,15 +106,15 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
 
         var replyChannel = message.getProperty(Headers.REPLY_CHANNEL);
         if (replyChannel == null) {
-            logger.error(REPLY_TOPIC + " header is missing.  Cannot reply to message.");
+            logger.error(Headers.REPLY_CHANNEL + " header is missing.  Cannot reply to message.");
             // TODO: Send ERROR
             consumer.negativeAcknowledge(message);
             return;
         }
 
-        var correlationId = message.getProperty(CORRELATION_ID);
+        var correlationId = message.getProperty(Headers.CORRELATION_ID);
         if (correlationId == null) {
-            logger.error(CORRELATION_ID + " header is missing.  Cannot process message.");
+            logger.error(Headers.CORRELATION_ID + " header is missing.  Cannot process message.");
             // TODO: Send ERROR
             consumer.negativeAcknowledge(message);
             return;
@@ -233,13 +242,13 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
      * @param status The status that describes the error
      */
     private void replyWithErrorResponse(String replyChannel, String correlationId, String userId, HttpStatus status) {
-        var replyTopicUrl = TopicUrl.getCommandTopicUrl(replyChannel);
+        var replyTopicUrl = getReplyTopicUrl(replyChannel);
         var replyProducer = producersManager.getProducer(replyTopicUrl, producerBuilder -> {
         });
         var executionException = new CommandExecutionException(status);
         var value = serializeCommandExecutionException(executionException);
         replyProducer.newMessage()
-                     .property(CORRELATION_ID, correlationId)
+                     .property(Headers.CORRELATION_ID, correlationId)
                      .property(USER_ID, userId)
                      .property(ERROR, value)
                      .sendAsync();
@@ -247,18 +256,22 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
 
     private void replyWithSuccessResponse(String replyChannel, String correlationId, String userId, R response) {
         try {
-            var topicUrl = TopicUrl.getCommandTopicUrl(replyChannel);
+            var topicUrl = getReplyTopicUrl(replyChannel);
             var producer = producersManager.getProducer(topicUrl, producerBuilder -> {
             });
             var value = objectMapper.writeValueAsBytes(response);
             producer.newMessage()
-                    .property(CORRELATION_ID, correlationId)
+                    .property(Headers.CORRELATION_ID, correlationId)
                     .property(USER_ID, userId)
                     .value(value)
                     .sendAsync();
         } catch (JsonProcessingException e) {
             replyWithErrorResponse(replyChannel, correlationId, userId, HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private String getReplyTopicUrl(String replyChannel) {
+        return tenant + "/" + PulsarNamespaces.COMMAND_REPLIES + "/" + replyChannel;
     }
 
     private String getSubscriptionName(CommandHandler<?, ?> handler) {
@@ -269,9 +282,9 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         return applicationName + "-" + handler.getChannelName() + "-handler";
     }
 
-    private static String getTopicUrl(CommandHandler<?, ?> handler) {
+    private String getRequestsTopicUrl(CommandHandler<?, ?> handler) {
         var channelName = handler.getChannelName();
-        return TopicUrl.getCommandTopicUrl(channelName);
+        return tenant + "/" + PulsarNamespaces.COMMAND_REQUESTS + "/" + channelName;
     }
 
     private String serializeCommandExecutionException(CommandExecutionException exception) {

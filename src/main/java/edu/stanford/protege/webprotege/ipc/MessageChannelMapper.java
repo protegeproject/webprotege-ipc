@@ -10,19 +10,21 @@ import edu.stanford.protege.webprotege.common.Response;
  */
 public class MessageChannelMapper {
 
-    private static final String REPLY_CHANNEL_SUFFIX = "-Replies";
+    private static final String REPLY_CHANNEL_SUFFIX = ":replies";
 
     private final String serviceName;
 
-    public MessageChannelMapper(String serviceName) {
-        this.serviceName = serviceName;
+    public MessageChannelMapper(String applicationName) {
+        this.serviceName = applicationName;
     }
 
+    @Deprecated
     public String getChannelName(Request<? extends Response> request) {
         return request.getChannel();
     }
 
+    @Deprecated
     public String getReplyChannelName(Request<? extends Response> request) {
-        return serviceName + "-" + getChannelName(request) + REPLY_CHANNEL_SUFFIX;
+        return serviceName + ":" + getChannelName(request) + REPLY_CHANNEL_SUFFIX;
     }
 }

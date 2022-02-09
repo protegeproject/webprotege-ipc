@@ -1,8 +1,6 @@
 package edu.stanford.protege.webprotege.ipc.pulsar;
 
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.ProjectRequest;
 import edu.stanford.protege.webprotege.common.Request;
@@ -10,7 +8,7 @@ import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.ipc.CommandExecutor;
 import edu.stanford.protege.webprotege.ipc.ExecutionContext;
 import edu.stanford.protege.webprotege.ipc.Headers;
-import edu.stanford.protege.webprotege.ipc.MessageChannelMapper;
+import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +20,10 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+
+import static edu.stanford.protege.webprotege.ipc.pulsar.PulsarNamespaces.COMMAND_REQUESTS;
 
 /**
  * Matthew Horridge
@@ -36,24 +35,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> implements CommandExecutor<Q, R> {
 
-    private static final String NAMESPACE = "commands";
-
     private static final Logger logger = LoggerFactory.getLogger(PulsarCommandExecutor.class);
 
     private final Class<R> responseClass;
 
-    @Autowired
+    @Value("${spring.application.name}")
     private String applicationName;
 
     @Autowired
     private PulsarClient pulsarClient;
 
     @Autowired
-    private ObjectMapper objectMapper;
+    private PulsarAdmin pulsarAdmin;
 
     @Autowired
-    private MessageChannelMapper channelMapper;
-
+    private ObjectMapper objectMapper;
 
     private Producer<byte []> producer;
 
@@ -65,6 +61,11 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
 
     private final Map<String, CompletableFuture<R>> replyHandlers = new ConcurrentHashMap<>();
 
+    @Value("${webprotege.pulsar.tenant}")
+    private String tenant;
+
+    private String replySubscriptionName;
+
 
     public PulsarCommandExecutor(Class<R> responseClass) {
         this.responseClass = responseClass;
@@ -73,25 +74,24 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
     @Override
     public CompletableFuture<R> execute(Q request, ExecutionContext executionContext) {
         try {
-            var replyChannel = channelMapper.getReplyChannelName(request);
+            var replyChannel = getReplyChannelName(request);
             var json = objectMapper.writeValueAsBytes(request);
             try {
                 var producer = getProducer(request);
-                var key = getKeyForRequest(request);
                 var correlationId = UUID.randomUUID().toString();
-                // TODO: Place correlation Id in a map
                 var replyFuture = new CompletableFuture<R>();
                 replyHandlers.put(correlationId, replyFuture);
-                producer.newMessage()
-                        // If project request
-                        .key(key)
-                        .value(json)
-                        .property(Headers.CORRELATION_ID, correlationId)
-                        .property(Headers.REPLY_CHANNEL, replyChannel)
-                        .property(Headers.USER_ID, executionContext.userId().value())
-                        // TODO: ProjectId
-                        .property(Headers.PROJECT_ID, "")
-                        .send();
+                var messageBuilder = producer.newMessage()
+                                       .value(json)
+                                       .property(Headers.CORRELATION_ID, correlationId)
+                                       .property(Headers.REPLY_CHANNEL, replyChannel)
+                                       .property(Headers.USER_ID, executionContext.userId().value());
+                if(request instanceof ProjectRequest) {
+                    var projectId = ((ProjectRequest<?>) request).projectId().id();
+                    messageBuilder.property(Headers.PROJECT_ID, projectId);
+                    messageBuilder.key(projectId);
+                }
+                messageBuilder.send();
                 return replyFuture;
             } catch (PulsarClientException e) {
                 e.printStackTrace();
@@ -103,10 +103,6 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
         }
     }
 
-    private String getKeyForRequest(Q request) {
-        return request instanceof ProjectRequest ? ((ProjectRequest<?>) request).projectId().value() : null;
-    }
-
     private synchronized Producer<byte []> getProducer(Q request) {
         try {
             if(producer != null) {
@@ -114,14 +110,14 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
             }
             ensureConsumerIsListeningForRepliesToRequest(request);
             if(requestChannel == null) {
-                requestChannel = channelMapper.getChannelName(request);
+                requestChannel = request.getChannel();
             }
             if(!this.requestChannel.equals(request.getChannel())) {
                 throw new RuntimeException("Request channel is not the request channel that is in use by this CommandExecutor");
             }
-            var topicName = "persistent://webprotege/" + NAMESPACE + "/" + requestChannel;
+            var topicName = "persistent://"+ tenant +"/" + COMMAND_REQUESTS + "/" + requestChannel;
             return producer = pulsarClient.newProducer()
-                    .producerName(applicationName)
+                    .producerName(applicationName + ":RequestProducers:" + request.getChannel())
                     .topic(topicName)
                     // TODO: SendTimeout
                     .create();
@@ -136,17 +132,27 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
                 return;
             }
             if(this.replyChannel == null) {
-                this.replyChannel = channelMapper.getReplyChannelName(request);
+                this.replyChannel = getReplyChannelName(request);
             }
-            if(!this.replyChannel.equals(channelMapper.getReplyChannelName(request))) {
+            if(!this.replyChannel.equals(getReplyChannelName(request))) {
                 throw new RuntimeException("Reply channel is not the channel that is in use by this command executor");
             }
-            var replyTopic = "persistent://webprotege/" + NAMESPACE + "/" + replyChannel;
+            var replyTopic = "persistent://" + tenant + "/" + PulsarNamespaces.COMMAND_REPLIES + "/" + replyChannel;
+
+            // Replies need to go to all instances of our application/service.  In other words we have a pub/sub
+            // situation.  In this case we need unique subscription names with exclusive subscriptions for each
+            // consumer.
+            replySubscriptionName = applicationName + ":" + replyChannel + ":" + UUID.randomUUID();
+            logger.info("Setting up consumer with subscription {} to listen for replies at {}",
+                        replySubscriptionName, replyTopic);
             consumer = pulsarClient.newConsumer()
-                                   .consumerName(applicationName)
+                                   .subscriptionName(replySubscriptionName)
+                                   .subscriptionType(SubscriptionType.Exclusive)
                                    .topic(replyTopic)
                                    .messageListener(this::handleReplyMessageReceived)
                                    .subscribe();
+            System.out.println("-------------------------------");
+            System.out.println(consumer.toString());
         } catch (PulsarClientException e) {
             throw new UncheckedIOException(e);
         }
@@ -174,8 +180,13 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
 
     @PreDestroy
     protected void preDestroy() {
+        close();
+    }
+
+    public void close() {
         if (consumer != null) {
             logger.info("Closing {} consumer listening to {}", applicationName, consumer.getTopic());
+            consumer.unsubscribeAsync();
             consumer.closeAsync();
         }
         if (producer != null) {
@@ -184,5 +195,7 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
         }
     }
 
-
+    private String getReplyChannelName(Q request) {
+        return request.getChannel() + ":replies";
+    }
 }

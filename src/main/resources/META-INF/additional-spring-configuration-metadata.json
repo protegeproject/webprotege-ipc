@@ -1,0 +1,8 @@
+{
+  "properties": [
+    {
+      "name": "webprotege.pulsar.serviceHttpUrl",
+      "type": "java.lang.String",
+      "description": "The Pulsar Service Http URL.  For example, http://localhost:8080"
+    }
+  ] }

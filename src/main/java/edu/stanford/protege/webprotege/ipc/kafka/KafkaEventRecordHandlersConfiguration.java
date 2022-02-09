@@ -25,7 +25,7 @@ import java.util.List;
  * Stanford Center for Biomedical Informatics Research
  * 2022-01-08
  */
-@Configuration
+//@Configuration
 public class KafkaEventRecordHandlersConfiguration implements KafkaListenerConfigurer {
 
     private static final Logger logger = LoggerFactory.getLogger(KafkaEventRecordHandlersConfiguration.class);
