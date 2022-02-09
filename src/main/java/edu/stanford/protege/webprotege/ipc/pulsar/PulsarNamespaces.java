@@ -9,7 +9,7 @@ public interface PulsarNamespaces {
 
     String COMMAND_REQUESTS = "command-requests";
 
-    String COMMAND_REPLIES = "command-replies";
+    String COMMAND_REPLIES = "command-responses";
 
     String EVENTS = "events";
 }
