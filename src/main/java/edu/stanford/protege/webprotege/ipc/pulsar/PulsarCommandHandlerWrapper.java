@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 
+import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
@@ -32,7 +33,7 @@ import static edu.stanford.protege.webprotege.ipc.Headers.USER_ID;
  */
 public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Response> {
 
-    private static Logger logger = LoggerFactory.getLogger(PulsarCommandHandlerWrapper.class);
+    private static final Logger logger = LoggerFactory.getLogger(PulsarCommandHandlerWrapper.class);
 
     private final String applicationName;
 
@@ -66,8 +67,13 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         this.authorizationStatusExecutor = authorizationStatusExecutor;
     }
 
+    @PreDestroy
     public void unsubscribe() {
-
+        try {
+            consumer.unsubscribe();
+        } catch (PulsarClientException e) {
+            logger.warn("An exception was thrown when unsubscribing", e);
+        }
     }
 
     public void subscribe() {
