@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.ProjectRequest;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
+import edu.stanford.protege.webprotege.ipc.CommandExecutionException;
 import edu.stanford.protege.webprotege.ipc.CommandExecutor;
 import edu.stanford.protege.webprotege.ipc.ExecutionContext;
 import edu.stanford.protege.webprotege.ipc.Headers;
@@ -165,10 +166,19 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
                 logger.info("CorrelationId in reply message is missing.  Cannot handle reply.  Ignoring reply.");
                 return;
             }
-            var replyHandler = replyHandlers.remove(correlationId);
-            var response = objectMapper.readValue(msg.getData(), responseClass);
-            consumer.acknowledge(msg);
-            replyHandler.complete(response);
+            var error = msg.getProperty(Headers.ERROR);
+            if(error != null) {
+                var executionException = objectMapper.readValue(error, CommandExecutionException.class);
+                var replyHandler = replyHandlers.remove(correlationId);
+                replyHandler.completeExceptionally(executionException);
+                consumer.acknowledge(msg);
+            }
+            else {
+                var replyHandler = replyHandlers.remove(correlationId);
+                var response = objectMapper.readValue(msg.getData(), responseClass);
+                consumer.acknowledge(msg);
+                replyHandler.complete(response);
+            }
         } catch (PulsarClientException e) {
             logger.error("Encountered Pulsar Client Exception", e);
             throw new UncheckedIOException(e);

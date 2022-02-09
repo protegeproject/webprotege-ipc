@@ -23,22 +23,22 @@ import org.springframework.test.annotation.DirtiesContext;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Matthew Horridge
  * Stanford Center for Biomedical Informatics Research
- * 2021-08-03
+ * 2022-02-09
  */
 @SpringBootTest
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class CommandExecutor_CommandHandler_Test {
+public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
 
     @Autowired
     CommandExecutor<TestRequest, TestResponse> executor;
@@ -69,14 +69,20 @@ public class CommandExecutor_CommandHandler_Test {
         assertThat(executor).isNotNull();
     }
 
+    /**
+     * Tests that if an uncaught exception leaks out from the handler then this is manifested as an internal server
+     * error (HTTP 500) in the caller.
+     */
     @Test
-    void shouldSendAndReceivedCommand() throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    void shouldSendRequestAndReceivedInternalServerErrorFromCommand() {
         var id = UUID.randomUUID().toString();
-        var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"),
-                                                                                "access-token-value"));
-        var res = response.get(5000, TimeUnit.SECONDS);
-        assertThat(res).isNotNull();
-        assertThat(res.getId()).isEqualTo(id);
+        assertThatThrownBy(() -> {
+            var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"), ""));
+            response.get(30, TimeUnit.SECONDS);
+        }).isInstanceOf(ExecutionException.class)
+          .hasCauseInstanceOf(CommandExecutionException.class)
+          .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getStatusCode() == 500);
+
     }
 
     @TestConfiguration
@@ -97,8 +103,6 @@ public class CommandExecutor_CommandHandler_Test {
         }
 
     }
-
-
 
 
     @JsonTypeName("TestRequest")
@@ -154,8 +158,8 @@ public class CommandExecutor_CommandHandler_Test {
 
         @Override
         public Mono<TestResponse> handleRequest(TestRequest request, ExecutionContext executionContext) {
-            return Mono.just(new TestResponse(request.getId()));
+            // Deliberately throw an exception to simulate an uncaught exception
+            throw new RuntimeException("Expected exception leaked by command handler");
         }
     }
-
 }

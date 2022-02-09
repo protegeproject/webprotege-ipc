@@ -216,30 +216,39 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
 
     private void handleAndReplyToRequest(String replyChannel, String correlationId, String userId, Q request) {
         var executionContext = new ExecutionContext(new UserId(userId), "");
-        var response = handler.handleRequest(request, executionContext);
-        response.subscribe(r -> {
-            replyWithSuccessResponse(replyChannel, correlationId, userId, r);
-            logger.info("Sent reply to {}", replyChannel);
-        }, throwable -> {
-            if (throwable instanceof CommandExecutionException ex) {
-                logger.info(
-                        "The command handler threw a CommandExecutionException exception while handling a request.  Sending an error as the reply to {}.  Code: {}, Message: {},  Request: {}",
-                        replyChannel,
-                        ex.getStatusCode(),
-                        throwable.getMessage(),
-                        request);
-                replyWithErrorResponse(replyChannel, correlationId, userId, ex.getStatus());
-            }
-            else {
-                logger.info(
-                        "The command handler threw an exception while handling a request.  Sending an error as the reply to {}.  Exception class: {}, Message: {},  Request: {}",
-                        replyChannel,
-                        throwable.getClass().getName(),
-                        throwable.getMessage(),
-                        request);
-                replyWithErrorResponse(replyChannel, correlationId, userId, HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        });
+        try {
+            var response = handler.handleRequest(request, executionContext);
+            response.subscribe(r -> {
+                replyWithSuccessResponse(replyChannel, correlationId, userId, r);
+                logger.info("Sent reply to {}", replyChannel);
+            }, throwable -> {
+                if (throwable instanceof CommandExecutionException ex) {
+                    logger.info(
+                            "The command handler threw a CommandExecutionException exception while handling a request.  Sending an error as the reply to {}.  Code: {}, Message: {},  Request: {}",
+                            replyChannel,
+                            ex.getStatusCode(),
+                            throwable.getMessage(),
+                            request);
+                    replyWithErrorResponse(replyChannel, correlationId, userId, ex.getStatus());
+                }
+                else {
+                    replyWithInternalServerError(replyChannel, correlationId, userId, request, throwable);
+                }
+            });
+        } catch (Throwable throwable) {
+            logger.error("Uncaught exception when handling request", throwable);
+            replyWithInternalServerError(replyChannel, correlationId, userId, request, throwable);
+        }
+    }
+
+    private void replyWithInternalServerError(String replyChannel, String correlationId, String userId, Q request, Throwable throwable) {
+        logger.info(
+                "The command handler threw an exception while handling a request.  Sending an error as the reply to {}.  Exception class: {}, Message: {},  Request: {}",
+                replyChannel,
+                throwable.getClass().getName(),
+                throwable.getMessage(),
+                request);
+        replyWithErrorResponse(replyChannel, correlationId, userId, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     /**
