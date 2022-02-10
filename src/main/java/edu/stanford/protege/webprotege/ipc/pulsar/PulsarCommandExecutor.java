@@ -191,18 +191,14 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
     }
 
     @PreDestroy
-    protected void preDestroy() {
-        close();
-    }
-
     public void close() {
         if (consumer != null) {
-            logger.info("Closing {} consumer listening to {}", applicationName, consumer.getTopic());
+            logger.info("Closing consumer listening to {}", consumer.getConsumerName());
             consumer.unsubscribeAsync();
             consumer.closeAsync();
         }
         if (producer != null) {
-            logger.info("Closing {} producer that publishes messages to {}", applicationName, producer.getTopic());
+            logger.info("Closing producer {}", producer.getProducerName());
             producer.closeAsync();
         }
     }
