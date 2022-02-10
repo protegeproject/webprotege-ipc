@@ -14,6 +14,7 @@ import org.apache.pulsar.client.api.Consumer;
 import org.apache.pulsar.client.api.Message;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
+import org.apache.pulsar.shade.javax.ws.rs.BadRequestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -113,7 +114,6 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         var replyChannel = message.getProperty(Headers.REPLY_CHANNEL);
         if (replyChannel == null) {
             logger.error(Headers.REPLY_CHANNEL + " header is missing.  Cannot reply to message.");
-            // TODO: Send ERROR
             consumer.negativeAcknowledge(message);
             return;
         }
@@ -121,7 +121,6 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         var correlationId = message.getProperty(Headers.CORRELATION_ID);
         if (correlationId == null) {
             logger.error(Headers.CORRELATION_ID + " header is missing.  Cannot process message.");
-            // TODO: Send ERROR
             consumer.negativeAcknowledge(message);
             return;
         }
@@ -130,7 +129,6 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         if (userId == null) {
             logger.error(USER_ID + " header is missing.  Cannot process message.  Treating as unauthorized.  Message reply topic: {}",
                          replyChannel);
-            //                sendError(record, replyChannel, replyHeaders, HttpStatus.UNAUTHORIZED);
             consumer.negativeAcknowledge(message);
             return;
         }
@@ -290,11 +288,11 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
     }
 
     private String getSubscriptionName(CommandHandler<?, ?> handler) {
-        return applicationName + "-" + handler.getChannelName() + "-handler";
+        return applicationName + "-" + handler.getChannelName() + "--handler";
     }
 
     private String getConsumerName(CommandHandler<?, ?> handler) {
-        return applicationName + "-" + handler.getChannelName() + "-handler";
+        return applicationName + "-" + handler.getChannelName() + "--handler";
     }
 
     private String getRequestsTopicUrl(CommandHandler<?, ?> handler) {
