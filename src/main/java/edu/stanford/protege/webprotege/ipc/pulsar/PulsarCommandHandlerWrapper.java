@@ -68,7 +68,6 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         this.authorizationStatusExecutor = authorizationStatusExecutor;
     }
 
-    @PreDestroy
     public void unsubscribe() {
         try {
             consumer.unsubscribe();
