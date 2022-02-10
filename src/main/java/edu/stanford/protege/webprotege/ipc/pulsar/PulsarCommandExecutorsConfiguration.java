@@ -28,7 +28,7 @@ public class PulsarCommandExecutorsConfiguration {
 
     public PulsarCommandExecutorsConfiguration(PulsarAdmin pulsarAdmin,
                                                @Value("${webprotege.pulsar.tenant}") String tenant,
-                                               @Value("${webprotege.pulsar.command-replies.subScriptionExpiraryTimeMillis}") int commandSubscriptionExpiraryTime) {
+                                               @Value("${webprotege.pulsar.command-replies.subscriptionExpiraryTimeMinutes}") int commandSubscriptionExpiraryTime) {
         this.pulsarAdmin = pulsarAdmin;
         this.tenant = tenant;
         this.commandSubscriptionExpiraryTime = commandSubscriptionExpiraryTime;

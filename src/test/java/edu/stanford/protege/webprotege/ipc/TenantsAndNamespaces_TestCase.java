@@ -48,12 +48,12 @@ public class TenantsAndNamespaces_TestCase {
 
     @Test
     void shouldCreateCommandRepliesNamespace() throws PulsarAdminException {
-        assertThat(pulsarAdmin.namespaces().getNamespaces(expectedTenant)).contains(expectedTenant + "/command-replies");
+        assertThat(pulsarAdmin.namespaces().getNamespaces(expectedTenant)).contains(expectedTenant + "/command-responses");
     }
 
     @Test
     void shouldSetExpirationTimeOnCommandRepliesNamespace() throws PulsarAdminException {
-        assertThat(pulsarAdmin.namespaces().getSubscriptionExpirationTime(expectedTenant + "/command-replies")).isNotEqualTo(0);
+        assertThat(pulsarAdmin.namespaces().getSubscriptionExpirationTime(expectedTenant + "/command-responses")).isNotEqualTo(0);
     }
 
     @Test
