@@ -288,11 +288,11 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
     }
 
     private String getSubscriptionName(CommandHandler<?, ?> handler) {
-        return applicationName + "-" + handler.getChannelName() + "--handler";
+        return applicationName + "--" + handler.getChannelName() + "--handler";
     }
 
     private String getConsumerName(CommandHandler<?, ?> handler) {
-        return applicationName + "-" + handler.getChannelName() + "--handler";
+        return applicationName + "--" + handler.getChannelName() + "--handler";
     }
 
     private String getRequestsTopicUrl(CommandHandler<?, ?> handler) {
