@@ -81,7 +81,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             consumer = pulsarClient.newConsumer()
                                         .topic(getRequestsTopicUrl(handler))
                                         .subscriptionName(getSubscriptionName(handler))
-                                        .consumerName(getConsumerName(handler))
+//                                        .consumerName(getConsumerName(handler))
                                         .messageListener(this::handleCommandMessage)
                                         .subscribe();
         } catch (PulsarClientException e) {
@@ -113,22 +113,23 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         var replyChannel = message.getProperty(Headers.REPLY_CHANNEL);
         if (replyChannel == null) {
             logger.error(Headers.REPLY_CHANNEL + " header is missing.  Cannot reply to message.");
-            consumer.negativeAcknowledge(message);
+            consumer.acknowledgeAsync(message);
             return;
         }
 
         var correlationId = message.getProperty(Headers.CORRELATION_ID);
         if (correlationId == null) {
             logger.error(Headers.CORRELATION_ID + " header is missing.  Cannot process message.");
-            consumer.negativeAcknowledge(message);
+            consumer.acknowledgeAsync(message);
             return;
         }
 
         var userId = message.getProperty(USER_ID);
         if (userId == null) {
-            logger.error(USER_ID + " header is missing.  Cannot process message.  Treating as unauthorized.  Message reply topic: {}",
+            logger.error(USER_ID + " header is missing.  Cannot process message.  Returning Forbidden Error Code.  Message reply topic: {}",
                          replyChannel);
-            consumer.negativeAcknowledge(message);
+            replyWithErrorResponse(replyChannel, correlationId, "", HttpStatus.FORBIDDEN);
+            consumer.acknowledgeAsync(message);
             return;
         }
 
