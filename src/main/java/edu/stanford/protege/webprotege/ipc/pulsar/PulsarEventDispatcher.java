@@ -77,7 +77,7 @@ public class PulsarEventDispatcher implements EventDispatcher {
     }
 
     private String getProducerName(Event event) {
-        return applicationName + "-" + event.getChannel() + "-producer";
+        return applicationName + "-" + event.getChannel() + "--event-producer";
     }
 
     private Optional<String> getJsonTypeName(Event event) {
