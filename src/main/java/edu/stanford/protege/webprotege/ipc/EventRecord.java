@@ -14,7 +14,7 @@ import java.util.Optional;
 public record EventRecord(String eventId,
                           long timestamp,
                           String eventType,
-                          String eventPayload,
+                          byte [] eventPayload,
                           @Nullable ProjectId projectId) {
 
 

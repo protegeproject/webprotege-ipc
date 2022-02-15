@@ -1,14 +1,9 @@
 package edu.stanford.protege.webprotege.ipc.pulsar;
 
-import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusRequest;
-import edu.stanford.protege.webprotege.authorization.GetAuthorizationStatusResponse;
 import edu.stanford.protege.webprotege.ipc.*;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 
 import javax.annotation.PostConstruct;

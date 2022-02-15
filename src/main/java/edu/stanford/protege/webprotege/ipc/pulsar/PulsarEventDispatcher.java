@@ -7,9 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.common.ProjectEvent;
 import edu.stanford.protege.webprotege.ipc.EventDispatcher;
+import edu.stanford.protege.webprotege.ipc.EventRecord;
+import edu.stanford.protege.webprotege.ipc.GenericEventHandler;
 import edu.stanford.protege.webprotege.ipc.Headers;
+import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.apache.pulsar.client.api.PulsarClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,6 +21,7 @@ import org.springframework.beans.factory.annotation.Value;
 import java.io.Closeable;
 import java.io.IOException;
 import java.util.Optional;
+import java.util.UUID;
 
 import static edu.stanford.protege.webprotege.ipc.Headers.*;
 
@@ -58,6 +63,7 @@ public class PulsarEventDispatcher implements EventDispatcher {
             producerBuilder.producerName(getProducerName(event));
         });
         serializeAndDispatchEvent(event, producer);
+        serializeAndDispatchEventRecord(event);
     }
 
     private void serializeAndDispatchEvent(Event event, Producer<byte[]> producer) {
@@ -70,14 +76,45 @@ public class PulsarEventDispatcher implements EventDispatcher {
                 var projectId = ((ProjectEvent) event).projectId().value();
                 messageBuilder.property(PROJECT_ID, projectId);
             }
-            messageBuilder.sendAsync();
+            var messageId = messageBuilder.send();
+            logger.info("Sent event message: {}", messageId);
         } catch (JsonProcessingException e) {
             logger.info("Could not serialize event: {}", e.getMessage(), e);
+        } catch (PulsarClientException e) {
+            logger.error("Could not send event message", e);
+        }
+    }
+
+    private void serializeAndDispatchEventRecord(Event event) {
+        try {
+            var allEventsTopicUrl = tenant + "/" + PulsarNamespaces.EVENTS + "/" + GenericEventHandler.ALL_EVENTS_CHANNEL;
+            var allEventsProducer = producersManager.getProducer(allEventsTopicUrl, producerBuilder -> {
+                producerBuilder.producerName(applicationName + "--all-events-producer");
+            });
+            var value = objectMapper.writeValueAsBytes(event);
+
+            var projectId = event instanceof ProjectEvent ? ((ProjectEvent) event).projectId() : null;
+            var eventId = UUID.randomUUID().toString();
+            var timestamp = System.currentTimeMillis();
+            var record = new EventRecord(eventId, timestamp, event.getChannel(), value, projectId);
+            var recordValue = objectMapper.writeValueAsBytes(record);
+            var messageBuilder = allEventsProducer.newMessage()
+                    .value(recordValue)
+                    .property(EVENT_TYPE, event.getChannel());
+            if(record.projectId() != null) {
+                messageBuilder.property(PROJECT_ID, record.projectId().value());
+            }
+            var messageId = messageBuilder.send();
+            logger.info("Sent event record message: {}", messageId);
+        } catch (JsonProcessingException e) {
+            logger.info("Could not serialize event: {}", e.getMessage(), e);
+        } catch (PulsarClientException e) {
+            logger.error("Could not send event message", e);
         }
     }
 
     private String getProducerName(Event event) {
-        return applicationName + "-" + event.getChannel() + "--event-producer";
+        return applicationName + "--" + event.getChannel() + "--event-producer";
     }
 
     private Optional<String> getJsonTypeName(Event event) {
