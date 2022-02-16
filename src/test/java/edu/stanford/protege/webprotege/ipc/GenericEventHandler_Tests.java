@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
+import edu.stanford.protege.webprotege.common.EventId;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.junit.jupiter.api.AfterEach;
@@ -79,7 +80,9 @@ public class GenericEventHandler_Tests {
 
     @JsonTypeName(CHANNEL)
     public static class TestEvent implements Event {
-        
+
+        private final EventId eventId = EventId.generate();
+
         private String id;
 
         protected static final String CHANNEL = "test.events.TestEvent";
@@ -91,6 +94,12 @@ public class GenericEventHandler_Tests {
 
         public String getId() {
             return id;
+        }
+
+        @Nonnull
+        @Override
+        public EventId eventId() {
+            return eventId;
         }
 
         @Override

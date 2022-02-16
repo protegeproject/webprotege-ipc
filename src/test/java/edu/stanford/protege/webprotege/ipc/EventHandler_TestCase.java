@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import edu.stanford.protege.webprotege.common.Event;
+import edu.stanford.protege.webprotege.common.EventId;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.PulsarClient;
@@ -103,6 +104,8 @@ public class EventHandler_TestCase {
 
         private final String id;
 
+        private EventId eventId;
+
         @JsonCreator
         public TestEvent(@JsonProperty("id") String id) {
             this.id = id;
@@ -110,6 +113,13 @@ public class EventHandler_TestCase {
 
         public String getId() {
             return id;
+        }
+
+        @Nonnull
+        @Override
+        public EventId eventId() {
+            eventId = EventId.generate();
+            return eventId;
         }
 
         @Override

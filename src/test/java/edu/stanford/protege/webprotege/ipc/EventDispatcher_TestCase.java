@@ -3,6 +3,7 @@ package edu.stanford.protege.webprotege.ipc;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import edu.stanford.protege.webprotege.common.EventId;
 import edu.stanford.protege.webprotege.common.ProjectEvent;
 import edu.stanford.protege.webprotege.common.ProjectId;
 import edu.stanford.protege.webprotege.ipc.pulsar.PulsarNamespaces;
@@ -19,6 +20,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.annotation.DirtiesContext;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.util.Map;
 
@@ -62,7 +64,7 @@ public class EventDispatcher_TestCase {
                                .topic(tenant + "/" + PulsarNamespaces.EVENTS + "/TestEventChannel")
                                .subscriptionName("test-consumer")
                                .subscribe();
-        var event = new TestEvent(THE_EVENT_ID, projectId);
+        var event = new TestEvent(EventId.generate(), THE_EVENT_ID, projectId);
         eventDispatcher.dispatchEvent(event);
     }
 
@@ -100,7 +102,8 @@ public class EventDispatcher_TestCase {
     }
 
     @JsonTypeName("TestEventType")
-    private static record TestEvent(String id,
+    private static record TestEvent(EventId eventId,
+                                    String id,
                                     ProjectId projectId) implements ProjectEvent {
 
         @Override
