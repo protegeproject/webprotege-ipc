@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
+import edu.stanford.protege.webprotege.common.EventId;
 import edu.stanford.protege.webprotege.common.ProjectEvent;
 import edu.stanford.protege.webprotege.ipc.EventDispatcher;
 import edu.stanford.protege.webprotege.ipc.EventRecord;
@@ -94,9 +95,8 @@ public class PulsarEventDispatcher implements EventDispatcher {
             var value = objectMapper.writeValueAsBytes(event);
 
             var projectId = event instanceof ProjectEvent ? ((ProjectEvent) event).projectId() : null;
-            var eventId = UUID.randomUUID().toString();
             var timestamp = System.currentTimeMillis();
-            var record = new EventRecord(eventId, timestamp, event.getChannel(), value, projectId);
+            var record = new EventRecord(event.eventId(), timestamp, event.getChannel(), value, projectId);
             var recordValue = objectMapper.writeValueAsBytes(record);
             var messageBuilder = allEventsProducer.newMessage()
                     .value(recordValue)

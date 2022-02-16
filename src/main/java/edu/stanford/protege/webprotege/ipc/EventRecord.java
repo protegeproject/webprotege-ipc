@@ -1,5 +1,6 @@
 package edu.stanford.protege.webprotege.ipc;
 
+import edu.stanford.protege.webprotege.common.EventId;
 import edu.stanford.protege.webprotege.common.ProjectId;
 
 import javax.annotation.Nonnull;
@@ -11,7 +12,7 @@ import java.util.Optional;
  * Stanford Center for Biomedical Informatics Research
  * 2022-01-08
  */
-public record EventRecord(String eventId,
+public record EventRecord(EventId eventId,
                           long timestamp,
                           String eventType,
                           byte [] eventPayload,

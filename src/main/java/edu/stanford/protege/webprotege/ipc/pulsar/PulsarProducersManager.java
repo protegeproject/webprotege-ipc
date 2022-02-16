@@ -55,7 +55,6 @@ public class PulsarProducersManager {
     private Producer<byte[]> createProducer(String topicUrl, java.util.function.Consumer<ProducerBuilder<byte[]>> producerCustomizer) {
         try {
             var producerBuilder = pulsarClient.newProducer()
-                                              .producerName(applicationName)
                                               .topic(topicUrl);
             producerCustomizer.accept(producerBuilder);
             return producerBuilder.create();
