@@ -47,6 +47,10 @@ public class PulsarProducersManager {
         this.applicationName = applicationName;
     }
 
+    public Producer<byte[]> getProducer(String topicUrl) {
+        return getProducer(topicUrl, producerBuilder -> {});
+    }
+
     public Producer<byte[]> getProducer(String topicUrl,
                                         java.util.function.Consumer<ProducerBuilder<byte[]>> producerCustomizer) {
         return cache.get(topicUrl, u -> createProducer(u, producerCustomizer));

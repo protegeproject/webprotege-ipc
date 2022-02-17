@@ -60,9 +60,7 @@ public class PulsarEventDispatcher implements EventDispatcher {
 
     private void createProducerAndDispatchEvent(Event event) {
         var eventTopicUrl = tenant + "/" + PulsarNamespaces.EVENTS + "/" + event.getChannel();
-        var producer = producersManager.getProducer(eventTopicUrl, producerBuilder -> {
-            producerBuilder.producerName(getProducerName(event));
-        });
+        var producer = producersManager.getProducer(eventTopicUrl);
         serializeAndDispatchEvent(event, producer);
         serializeAndDispatchEventRecord(event);
     }
@@ -89,9 +87,7 @@ public class PulsarEventDispatcher implements EventDispatcher {
     private void serializeAndDispatchEventRecord(Event event) {
         try {
             var allEventsTopicUrl = tenant + "/" + PulsarNamespaces.EVENTS + "/" + GenericEventHandler.ALL_EVENTS_CHANNEL;
-            var allEventsProducer = producersManager.getProducer(allEventsTopicUrl, producerBuilder -> {
-                producerBuilder.producerName(applicationName + "--all-events-producer");
-            });
+            var allEventsProducer = producersManager.getProducer(allEventsTopicUrl);
             var value = objectMapper.writeValueAsBytes(event);
 
             var projectId = event instanceof ProjectEvent ? ((ProjectEvent) event).projectId() : null;

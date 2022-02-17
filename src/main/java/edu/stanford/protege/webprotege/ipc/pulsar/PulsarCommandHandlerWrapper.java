@@ -256,8 +256,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
      */
     private void replyWithErrorResponse(String replyChannel, String correlationId, String userId, HttpStatus status) {
         var replyTopicUrl = getReplyTopicUrl(replyChannel);
-        var replyProducer = producersManager.getProducer(replyTopicUrl, producerBuilder -> {
-        });
+        var replyProducer = producersManager.getProducer(replyTopicUrl);
         var executionException = new CommandExecutionException(status);
         var value = serializeCommandExecutionException(executionException);
         replyProducer.newMessage()
@@ -270,8 +269,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
     private void replyWithSuccessResponse(String replyChannel, String correlationId, String userId, R response) {
         try {
             var topicUrl = getReplyTopicUrl(replyChannel);
-            var producer = producersManager.getProducer(topicUrl, producerBuilder -> {
-            });
+            var producer = producersManager.getProducer(topicUrl);
             var value = objectMapper.writeValueAsBytes(response);
             producer.newMessage()
                     .property(Headers.CORRELATION_ID, correlationId)
