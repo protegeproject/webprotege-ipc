@@ -81,7 +81,6 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             consumer = pulsarClient.newConsumer()
                                         .topic(getRequestsTopicUrl(handler))
                                         .subscriptionName(getSubscriptionName(handler))
-//                                        .consumerName(getConsumerName(handler))
                                         .messageListener(this::handleCommandMessage)
                                         .subscribe();
         } catch (PulsarClientException e) {
