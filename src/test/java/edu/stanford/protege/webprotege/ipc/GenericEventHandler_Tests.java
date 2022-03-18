@@ -69,7 +69,6 @@ public class GenericEventHandler_Tests {
 
     @AfterEach
     void tearDown() throws PulsarAdminException {
-        PulsarTestUtils.deleteTestTenant(pulsarAdmin, tenant);
     }
 
     @Test
