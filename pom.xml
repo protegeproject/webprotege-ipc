@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>edu.stanford.protege</groupId>
 	<artifactId>webprotege-ipc</artifactId>
-	<version>0.9.3</version>
+	<version>0.10.0</version>
 	<name>webprotege-ipc</name>
 	<description>Inter Process Communication framework</description>
 	<properties>
