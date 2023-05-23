@@ -10,9 +10,12 @@ import edu.stanford.protege.webprotege.ipc.pulsar.PulsarCommandExecutor;
 import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.PulsarClient;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,6 +23,10 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.annotation.DirtiesContext;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.PulsarContainer;
+import org.testcontainers.utility.DockerImageName;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Nonnull;
@@ -37,6 +44,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 2021-08-03
  */
 @SpringBootTest
+@ExtendWith(PulsarTestExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class CommandExecutor_CommandHandler_Test {
 
@@ -55,14 +63,16 @@ public class CommandExecutor_CommandHandler_Test {
     @Value("${webprotege.pulsar.tenant}")
     private String tenant;
 
+
     @BeforeEach
     void setUp() {
+
     }
 
     @AfterEach
     void tearDown() throws PulsarAdminException {
-        PulsarTestUtils.deleteTestTenant(pulsarAdmin, tenant);
     }
+
 
     @Test
     void shouldAutowireCommandExecutor() {

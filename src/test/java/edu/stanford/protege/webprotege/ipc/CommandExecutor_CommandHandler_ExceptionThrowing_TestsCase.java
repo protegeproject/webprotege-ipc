@@ -13,6 +13,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -37,6 +38,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 2022-02-09
  */
 @SpringBootTest
+@ExtendWith(PulsarTestExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
 
@@ -61,7 +63,6 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
 
     @AfterEach
     void tearDown() throws PulsarAdminException {
-        PulsarTestUtils.deleteTestTenant(pulsarAdmin, tenant);
     }
 
     @Test

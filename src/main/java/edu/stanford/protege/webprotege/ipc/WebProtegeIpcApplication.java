@@ -55,11 +55,6 @@ public class WebProtegeIpcApplication {
 	}
 
 	@Bean
-	ReplyErrorChecker replyErrorChecker(ObjectMapper objectMapper) {
-		return new ReplyErrorChecker(objectMapper);
-	}
-
-	@Bean
 	EventDispatcher eventDispatcher(@Value("${spring.application.name}") String applicationName,
 									PulsarProducersManager pulsarProducersManager, ObjectMapper objectMapper) {
 		return new PulsarEventDispatcher(applicationName, pulsarProducersManager, objectMapper, tenant);

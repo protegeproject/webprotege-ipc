@@ -15,6 +15,7 @@ import org.apache.pulsar.client.api.PulsarClientException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 2021-08-04
  */
 @SpringBootTest
+@ExtendWith(PulsarTestExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class EventDispatcher_TestCase {
 
@@ -73,7 +75,6 @@ public class EventDispatcher_TestCase {
         consumer.unsubscribe();
         consumer.close();
         pulsarClient.close();
-        PulsarTestUtils.deleteTestTenant(pulsarAdmin, tenant);
     }
 
     @Test
