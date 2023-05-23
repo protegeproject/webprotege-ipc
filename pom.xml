@@ -62,7 +62,7 @@
 		<dependency>
 			<groupId>edu.stanford.protege</groupId>
 			<artifactId>webprotege-common</artifactId>
-			<version>0.9.1-SNAPSHOT</version>
+			<version>0.9.1</version>
 		</dependency>
 
 		<dependency>
