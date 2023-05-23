@@ -48,9 +48,6 @@ public class EventDispatcher_TestCase {
     @Autowired
     private ObjectMapper objectMapper;
 
-    @Autowired
-    private PulsarAdmin pulsarAdmin;
-
     @Value("${webprotege.pulsar.tenant}")
     private String tenant;
 
@@ -74,7 +71,6 @@ public class EventDispatcher_TestCase {
     void tearDown() throws PulsarClientException, PulsarAdminException {
         consumer.unsubscribe();
         consumer.close();
-        pulsarClient.close();
     }
 
     @Test
