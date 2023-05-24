@@ -3,6 +3,8 @@ package edu.stanford.protege.webprotege.ipc;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.BeforeAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.PulsarContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -13,8 +15,9 @@ import org.testcontainers.utility.DockerImageName;
  */
 public class PulsarTestExtension implements BeforeAllCallback, AfterAllCallback {
 
-    private PulsarContainer pulsarContainer;
+    private static Logger logger = LoggerFactory.getLogger(PulsarTestExtension.class);
 
+    private PulsarContainer pulsarContainer;
 
     @Override
     public void beforeAll(ExtensionContext extensionContext) throws Exception {
@@ -24,12 +27,15 @@ public class PulsarTestExtension implements BeforeAllCallback, AfterAllCallback 
                 .withExposedPorts(6650, 8080);
         pulsarContainer.start();
 
-        System.setProperty("webprotege.pulsar.serviceHttpUrl", "http://localhost:" + pulsarContainer.getMappedPort(8080));
-        System.setProperty("webprotege.pulsar.serviceUrl", "pulsar://localhost:" + pulsarContainer.getMappedPort(6650));
+        var mappedHttpPort = pulsarContainer.getMappedPort(8080);
+        logger.info("Pulsar port 8080 is mapped to {}", mappedHttpPort);
+        System.setProperty("webprotege.pulsar.serviceHttpUrl", "http://localhost:" + mappedHttpPort);
+        var mappedPort = pulsarContainer.getMappedPort(6650);
+        logger.info("Pulsar port 6650 is mapped to {}", mappedPort);
+        System.setProperty("webprotege.pulsar.serviceUrl", "pulsar://localhost:" + mappedPort);
     }
 
     @Override
     public void afterAll(ExtensionContext extensionContext) throws Exception {
-        pulsarContainer.stop();
     }
 }

@@ -7,7 +7,6 @@ import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.common.UserId;
 import edu.stanford.protege.webprotege.ipc.pulsar.PulsarCommandExecutor;
-import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.junit.jupiter.api.AfterEach;
@@ -15,7 +14,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
@@ -27,7 +25,6 @@ import javax.annotation.Nonnull;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -50,12 +47,6 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
 
     @Autowired
     PulsarClient pulsarClient;
-
-    @Autowired
-    private PulsarAdmin pulsarAdmin;
-
-    @Value("${webprotege.pulsar.tenant}")
-    private String tenant;
 
     @BeforeEach
     void setUp() {

@@ -6,21 +6,18 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.common.EventId;
-import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.admin.PulsarAdminException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.test.annotation.DirtiesContext;
 
 import javax.annotation.Nonnull;
-
 import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -52,16 +49,6 @@ public class GenericEventHandler_Tests {
 
     @Autowired
     private EventDispatcher eventDispatcher;
-
-    @Autowired
-    private PulsarAdmin pulsarAdmin;
-
-    @Value("${webprotege.pulsar.tenant}")
-    private String tenant;
-
-    @Value("${spring.application.name}")
-    private String applicationName;
-
 
     @BeforeEach
     void setUp() throws PulsarAdminException {
