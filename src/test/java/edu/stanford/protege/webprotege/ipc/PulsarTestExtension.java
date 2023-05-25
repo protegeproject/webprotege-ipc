@@ -37,5 +37,6 @@ public class PulsarTestExtension implements BeforeAllCallback, AfterAllCallback 
 
     @Override
     public void afterAll(ExtensionContext extensionContext) throws Exception {
+        pulsarContainer.stop();
     }
 }
