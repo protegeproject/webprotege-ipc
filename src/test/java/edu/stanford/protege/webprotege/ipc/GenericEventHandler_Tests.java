@@ -7,10 +7,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.common.EventId;
 import org.apache.pulsar.client.admin.PulsarAdminException;
+import org.apache.pulsar.client.impl.ConsumerStatsRecorderImpl;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -37,13 +40,11 @@ import static org.assertj.core.api.Assertions.fail;
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class GenericEventHandler_Tests {
 
+    private static final Logger logger = LoggerFactory.getLogger(GenericEventHandler_Tests.class);
 
     protected static final String HANDLER_NAME = "GenericEventHandlerTestHandler";
 
-    protected static final String TOPIC_URL = "persistent://webprotege-ipc-test-tenant/events/webprotege.events.all";
-
     private static String testEventId;
-
 
     private static CountDownLatch countDownLatch;
 
@@ -110,7 +111,7 @@ public class GenericEventHandler_Tests {
 
         @Override
         public void handlerSubscribed() {
-            System.out.println("The handler has been subscribed");
+            logger.info("The handler has been subscribed");
         }
 
         @Override
