@@ -100,6 +100,7 @@ public class WebProtegeIpcApplication {
 	@Bean
 	PulsarClient pulsarClient() throws PulsarClientException {
 		return PulsarClient.builder()
+						   .connectionTimeout(3, TimeUnit.MINUTES)
 						   .serviceUrl(pulsarServiceUrl).build();
 	}
 
