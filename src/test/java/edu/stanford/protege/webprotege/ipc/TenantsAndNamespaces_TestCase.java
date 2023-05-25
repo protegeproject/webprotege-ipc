@@ -31,8 +31,6 @@ public class TenantsAndNamespaces_TestCase {
 
     @BeforeEach
     void setUp() {
-        System.out.println(System.identityHashCode(pulsarAdmin));
-        System.out.println(expectedTenant);
     }
 
     @Test
