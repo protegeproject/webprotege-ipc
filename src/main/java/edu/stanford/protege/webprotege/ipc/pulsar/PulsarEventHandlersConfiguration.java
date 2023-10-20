@@ -12,7 +12,10 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Scope;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.event.EventListener;
 
 import javax.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -31,20 +34,21 @@ public class PulsarEventHandlersConfiguration {
     @Autowired(required = false)
     private List<EventHandler<? extends Event>> eventHandlers = new ArrayList<>();
 
+    @Lazy
     @Autowired
-    private ApplicationContext context;
+    private PulsarEventHandlerWrapperFactory wrapperFactory;
 
-    @PostConstruct
-    private void postConstruct() {
-        var wrapperFactory = context.getBean(PulsarEventHandlerWrapperFactory.class);
+    @EventListener
+    public void onApplicationEvent(ContextRefreshedEvent event) {
         logger.info("Event handlers configuration:");
         eventHandlers.forEach(handler -> {
             logger.info("Auto-detected event handler {} for channel {}",
                         handler.getHandlerName(),
                         handler.getChannelName());
-            var wrapper = wrapperFactory.create(handler);
-            wrapper.subscribe();
+                        var wrapper = wrapperFactory.create(handler);
+                        wrapper.subscribe();
         });
+
     }
 
     @Bean
@@ -55,9 +59,6 @@ public class PulsarEventHandlersConfiguration {
         return handler -> pulsarEventHandlerWrapper(handler, applicationName, objectMapper, pulsarClient, tenant);
     }
 
-    @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
-    @Bean
-    @Scope(ConfigurableBeanFactory.SCOPE_PROTOTYPE)
     public PulsarEventHandlerWrapper<?> pulsarEventHandlerWrapper(EventHandler<?> handler,
                                                                   String applicationName,
                                                                   ObjectMapper objectMapper, PulsarClient pulsarClient,

@@ -11,7 +11,10 @@ import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.context.annotation.Scope;
+import org.springframework.context.event.ContextRefreshedEvent;
+import org.springframework.context.event.EventListener;
 
 import javax.annotation.PostConstruct;
 import java.util.ArrayList;
@@ -30,12 +33,14 @@ public class PulsarGenericEventHandlersConfiguration {
     @Autowired(required = false)
     private List<GenericEventHandler> eventHandlers = new ArrayList<>();
 
+    @Lazy
     @Autowired
-    ApplicationContext context;
+    PulsarGenericEventHandlerWrapperFactory wrapperFactory;
 
-    @PostConstruct
-    private void postConstruct() {
-        var wrapperFactory = context.getBean(PulsarGenericEventHandlerWrapperFactory.class);
+
+
+    @EventListener
+    private void onApplicationEvent(ContextRefreshedEvent event) {
         logger.info("Event handlers configuration:");
         eventHandlers.forEach(handler -> {
             logger.info("Auto-detected generic event handler: {}",
