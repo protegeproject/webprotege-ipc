@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Scope;
@@ -30,10 +31,11 @@ public class PulsarGenericEventHandlersConfiguration {
     private List<GenericEventHandler> eventHandlers = new ArrayList<>();
 
     @Autowired
-    PulsarGenericEventHandlerWrapperFactory wrapperFactory;
+    ApplicationContext context;
 
     @PostConstruct
     private void postConstruct() {
+        var wrapperFactory = context.getBean(PulsarGenericEventHandlerWrapperFactory.class);
         logger.info("Event handlers configuration:");
         eventHandlers.forEach(handler -> {
             logger.info("Auto-detected generic event handler: {}",
