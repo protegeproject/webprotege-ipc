@@ -24,8 +24,7 @@ import javax.annotation.PreDestroy;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 
-import static edu.stanford.protege.webprotege.ipc.Headers.ERROR;
-import static edu.stanford.protege.webprotege.ipc.Headers.USER_ID;
+import static edu.stanford.protege.webprotege.ipc.Headers.*;
 
 /**
  * Matthew Horridge
@@ -132,6 +131,15 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             return;
         }
 
+        var accessToken = message.getProperty(ACCESS_TOKEN);
+        if(accessToken == null) {
+            logger.error(ACCESS_TOKEN + " header is missing.  Cannot process message.  Returning Forbidden Error Code.  Message reply topic: {}",
+                    replyChannel);
+            replyWithErrorResponse(replyChannel, correlationId, "", HttpStatus.FORBIDDEN);
+            consumer.acknowledgeAsync(message);
+            return;
+        }
+
 
         //        var accessToken = inboundHeaders.lastHeader(Headers.ACCESS_TOKEN);
         //        if (accessToken == null) {
@@ -142,14 +150,15 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         //        replyHeaders.add(new RecordHeader(Headers.ACCESS_TOKEN, accessToken.value()));
 
 
-        parseAndHandleRequest(consumer, message, replyChannel, correlationId, userId);
+        parseAndHandleRequest(consumer, message, replyChannel, correlationId, userId, accessToken);
     }
 
     private void parseAndHandleRequest(Consumer<byte[]> consumer,
                                        Message<byte[]> message,
                                        String replyChannel,
                                        String correlationId,
-                                       String userId) {
+                                       String userId,
+                                       String accessToken) {
         try {
             var payload = message.getData();
             var request = objectMapper.readValue(payload, handler.getRequestClass());
@@ -158,10 +167,10 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             consumer.acknowledgeAsync(message);
 
             if (handler instanceof AuthorizedCommandHandler<Q, R> authorizedCommandHandler) {
-                authorizeAndReplyToRequest(replyChannel, correlationId, userId, request, authorizedCommandHandler);
+                authorizeAndReplyToRequest(replyChannel, correlationId, userId, request, authorizedCommandHandler, accessToken);
             }
             else {
-                handleAndReplyToRequest(replyChannel, correlationId, userId, request);
+                handleAndReplyToRequest(replyChannel, correlationId, userId, request, accessToken);
             }
 
         } catch (IOException e) {
@@ -175,7 +184,8 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
                                             String correlationId,
                                             String userId,
                                             Q request,
-                                            AuthorizedCommandHandler<Q, R> authenticatingCommandHandler) {
+                                            AuthorizedCommandHandler<Q, R> authenticatingCommandHandler,
+                                            String accessToken) {
         var resource = authenticatingCommandHandler.getTargetResource(request);
         var subject = Subject.forUser(userId);
         var requiredActionId = authenticatingCommandHandler.getRequiredCapabilities();
@@ -198,7 +208,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             else {
                 // The call to the authorization service succeeded
                 if (authResponse.authorizationStatus() == AuthorizationStatus.AUTHORIZED) {
-                    handleAndReplyToRequest(replyChannel, correlationId, userId, request);
+                    handleAndReplyToRequest(replyChannel, correlationId, userId, request, accessToken);
                 }
                 else {
                     logger.info("Permission denied when attempting to execute a request.  User: {}, Request: {}",
@@ -211,8 +221,8 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         });
     }
 
-    private void handleAndReplyToRequest(String replyChannel, String correlationId, String userId, Q request) {
-        var executionContext = new ExecutionContext(new UserId(userId), "");
+    private void handleAndReplyToRequest(String replyChannel, String correlationId, String userId, Q request, String accessToken) {
+        var executionContext = new ExecutionContext(new UserId(userId), accessToken);
         try {
             var response = handler.handleRequest(request, executionContext);
             response.subscribe(r -> {

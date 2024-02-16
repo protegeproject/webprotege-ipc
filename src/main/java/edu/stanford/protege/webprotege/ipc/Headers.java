@@ -20,4 +20,6 @@ public class Headers {
     public static final String EVENT_TYPE = PREFIX + "eventType";
 
     public static final String PROJECT_ID = PREFIX + "projectId";
+
+    public static final String ACCESS_TOKEN = PREFIX + "accessToken";
 }

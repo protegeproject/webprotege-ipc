@@ -86,6 +86,7 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
                                              .value(json)
                                              .property(Headers.CORRELATION_ID, correlationId)
                                              .property(Headers.REPLY_CHANNEL, replyChannel)
+                                             .property(Headers.ACCESS_TOKEN, executionContext.jwt())
                                              .property(Headers.USER_ID, executionContext.userId().value());
                 if (request instanceof ProjectRequest) {
                     var projectId = ((ProjectRequest<?>) request).projectId().id();
