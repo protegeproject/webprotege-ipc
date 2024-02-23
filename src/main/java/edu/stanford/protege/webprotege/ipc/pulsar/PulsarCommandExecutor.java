@@ -65,8 +65,6 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
     @Value("${webprotege.pulsar.tenant}")
     private String tenant;
 
-    private String replySubscriptionName;
-
 
     public PulsarCommandExecutor(Class<R> responseClass) {
         this.responseClass = responseClass;
@@ -82,6 +80,10 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
                 var correlationId = UUID.randomUUID().toString();
                 var replyFuture = new CompletableFuture<R>();
                 replyHandlers.put(correlationId, replyFuture);
+                logger.info("ALEX avem consumer si producers. " +
+                                "Consumer  pe topic {} iar producer pe topic {}  si correlation id la mesaj {}.\n" +
+                                " reply handlers are dimensiunea {} si chei are {} ",
+                        consumer.getTopic(), producer.getTopic(), correlationId, replyHandlers.size(), replyHandlers.keySet());
                 var messageBuilder = producer.newMessage()
                                              .value(json)
                                              .property(Headers.CORRELATION_ID, correlationId)
@@ -121,6 +123,8 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
             var topicName = "persistent://" + tenant + "/" + COMMAND_REQUESTS + "/" + requestChannel;
             // TODO: Consider exposing settings as configuration properties
             var producerName = applicationName + "--CommandExecutor--" + request.getChannel();
+            logger.info("ALEX post to topic {} and producerName {}", topicName, producerName);
+
             return producer = pulsarClient.newProducer()
                                           .producerName(producerName)
                                           .topic(topicName)
@@ -147,9 +151,9 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
             // Replies need to go to all instances of our application/service.  In other words we have a pub/sub
             // situation.  In this case we need unique subscription names with exclusive subscriptions for each
             // consumer.
-            replySubscriptionName = applicationName + "--" + replyChannel + "--" + UUID.randomUUID();
+            String replySubscriptionName = applicationName + "--" + replyChannel + "--" + UUID.randomUUID();
             logger.info("Setting up consumer with subscription {} to listen for replies at {}",
-                        replySubscriptionName,
+                    replySubscriptionName,
                         replyTopic);
             consumer = pulsarClient.newConsumer()
                                    .subscriptionName(replySubscriptionName)
@@ -169,6 +173,8 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
                 logger.info("CorrelationId in reply message is missing.  Cannot handle reply.  Ignoring reply.");
                 return;
             }
+            logger.info("Alex a venit raspunsul pe correlationId {}", correlationId);
+
             var error = msg.getProperty(Headers.ERROR);
             if (error != null) {
                 var executionException = objectMapper.readValue(error, CommandExecutionException.class);
@@ -179,6 +185,7 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
             else {
                 var replyHandler = replyHandlers.remove(correlationId);
                 var response = objectMapper.readValue(msg.getData(), responseClass);
+                logger.info("ALEX raspund la reply handler {} cu response {}", replyHandler, response);
                 consumer.acknowledge(msg);
                 replyHandler.complete(response);
             }
@@ -187,6 +194,9 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
             throw new UncheckedIOException(e);
         } catch (IOException e) {
             logger.error("Cannot deserialize reply message on topic {}", consumer.getTopic(), e);
+            consumer.negativeAcknowledge(msg);
+        } catch (Exception e) {
+            logger.error("Unknown error {}", consumer.getTopic(), e);
             consumer.negativeAcknowledge(msg);
         }
     }

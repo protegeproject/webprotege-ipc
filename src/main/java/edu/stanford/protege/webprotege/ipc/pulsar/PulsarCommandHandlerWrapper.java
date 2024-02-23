@@ -162,6 +162,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
         try {
             var payload = message.getData();
             var request = objectMapper.readValue(payload, handler.getRequestClass());
+            logger.info("ALEX correlationID {}  handler {}" ,correlationId, handler.getClass());
             // The request has successfully been read.  All required headers are present and the request body
             // is well-formed so acknowledge the request (i.e. it shouldn't be dead-lettered)
             consumer.acknowledgeAsync(message);
@@ -227,7 +228,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             var response = handler.handleRequest(request, executionContext);
             response.subscribe(r -> {
                 replyWithSuccessResponse(replyChannel, correlationId, userId, r);
-                logger.info("Sent reply to {}", replyChannel);
+                logger.info("Sent reply correlationId {} to {}",correlationId, replyChannel);
             }, throwable -> {
                 if (throwable instanceof CommandExecutionException ex) {
                     logger.info(
@@ -264,15 +265,19 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
      * @param status The status that describes the error
      */
     private void replyWithErrorResponse(String replyChannel, String correlationId, String userId, HttpStatus status) {
-        var replyTopicUrl = getReplyTopicUrl(replyChannel);
-        var replyProducer = producersManager.getProducer(replyTopicUrl);
-        var executionException = new CommandExecutionException(status);
-        var value = serializeCommandExecutionException(executionException);
-        replyProducer.newMessage()
-                     .property(Headers.CORRELATION_ID, correlationId)
-                     .property(USER_ID, userId)
-                     .property(ERROR, value)
-                     .sendAsync();
+        try {
+            var replyTopicUrl = getReplyTopicUrl(replyChannel);
+            var replyProducer = producersManager.getProducer(replyTopicUrl);
+            var executionException = new CommandExecutionException(status);
+            var value = serializeCommandExecutionException(executionException);
+            replyProducer.newMessage()
+                    .property(Headers.CORRELATION_ID, correlationId)
+                    .property(USER_ID, userId)
+                    .property(ERROR, value)
+                    .send();
+        } catch (Exception e){
+            logger.error("Am erroare ", e);
+        }
     }
 
     private void replyWithSuccessResponse(String replyChannel, String correlationId, String userId, R response) {
@@ -280,13 +285,16 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
             var topicUrl = getReplyTopicUrl(replyChannel);
             var producer = producersManager.getProducer(topicUrl);
             var value = objectMapper.writeValueAsBytes(response);
+            logger.info("ALEX reply correlationId {} pe topic {} cu {}",correlationId, producer.getTopic(), objectMapper.writeValueAsString(response));
             producer.newMessage()
                     .property(Headers.CORRELATION_ID, correlationId)
                     .property(USER_ID, userId)
                     .value(value)
-                    .sendAsync();
+                    .send();
         } catch (JsonProcessingException e) {
             replyWithErrorResponse(replyChannel, correlationId, userId, HttpStatus.INTERNAL_SERVER_ERROR);
+        } catch (Exception e){
+            logger.error("Am erroare ", e);
         }
     }
 
@@ -304,7 +312,9 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
 
     private String getRequestsTopicUrl(CommandHandler<?, ?> handler) {
         var channelName = handler.getChannelName();
-        return tenant + "/" + PulsarNamespaces.COMMAND_REQUESTS + "/" + channelName;
+        String response = tenant + "/" + PulsarNamespaces.COMMAND_REQUESTS + "/" + channelName;
+        logger.info("ALEX getRequestsTopicUrl " + response);
+        return response;
     }
 
     private String serializeCommandExecutionException(CommandExecutionException exception) {
