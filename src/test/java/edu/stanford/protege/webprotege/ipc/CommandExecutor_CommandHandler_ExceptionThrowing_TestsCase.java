@@ -6,13 +6,9 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.common.UserId;
-import edu.stanford.protege.webprotege.ipc.pulsar.PulsarCommandExecutor;
-import org.apache.pulsar.client.admin.PulsarAdminException;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.junit.jupiter.api.AfterEach;
+import edu.stanford.protege.webprotege.ipc.impl.CommandExecutorImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -35,9 +31,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 2022-02-09
  */
 @SpringBootTest
-@ExtendWith(PulsarTestExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
+public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends IntegrationTestsExtension {
 
     @Autowired
     CommandExecutor<TestRequest, TestResponse> executor;
@@ -45,15 +40,9 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
     @Autowired
     ApplicationContext applicationContext;
 
-    @Autowired
-    PulsarClient pulsarClient;
 
     @BeforeEach
     void setUp() {
-    }
-
-    @AfterEach
-    void tearDown() throws PulsarAdminException {
     }
 
     @Test
@@ -86,7 +75,7 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase {
          */
         @Bean
         CommandExecutor<TestRequest, TestResponse> commandExecutor() {
-            return new PulsarCommandExecutor<>(TestResponse.class);
+            return new CommandExecutorImpl<>(TestResponse.class);
         }
 
         @Bean

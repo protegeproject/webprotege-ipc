@@ -11,6 +11,7 @@ import javax.annotation.Nonnull;
  * Stanford Center for Biomedical Informatics Research
  * 2021-08-06
  */
+@WebProtegeHandler
 public interface CommandHandler<Q extends Request<R>, R extends Response> {
 
     /**

@@ -39,18 +39,6 @@
 		</dependency>
 
 		<dependency>
-			<groupId>org.apache.pulsar</groupId>
-			<artifactId>pulsar-client</artifactId>
-			<version>3.1.0</version>
-		</dependency>
-
-		<dependency>
-			<groupId>org.apache.pulsar</groupId>
-			<artifactId>pulsar-client-admin</artifactId>
-			<version>3.1.0</version>
-		</dependency>
-
-		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-cache</artifactId>
 		</dependency>
@@ -109,18 +97,32 @@
 
 		<dependency>
 			<groupId>org.testcontainers</groupId>
-			<artifactId>testcontainers</artifactId>
-			<version>1.18.1</version>
+			<artifactId>junit-jupiter</artifactId>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+			<version>3.0.8</version>
+		</dependency>
+		<dependency>
 			<groupId>org.testcontainers</groupId>
-			<artifactId>pulsar</artifactId>
-			<version>1.18.1</version>
+			<artifactId>rabbitmq</artifactId>
+			<scope>test</scope>
 		</dependency>
 
 	</dependencies>
-
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>1.17.1</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<profiles>
 		<profile>
 			<id>release</id>
