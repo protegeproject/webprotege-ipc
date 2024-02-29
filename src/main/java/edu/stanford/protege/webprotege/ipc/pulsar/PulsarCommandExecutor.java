@@ -13,6 +13,7 @@ import org.apache.pulsar.client.admin.PulsarAdmin;
 import org.apache.pulsar.client.api.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 
@@ -51,6 +52,9 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private RabbitTemplate rabbitTemplate;
 
     private Producer<byte[]> producer;
 
@@ -104,6 +108,37 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
         } catch (JsonProcessingException e) {
             logger.error("JSON Processing Exception");
             throw new UncheckedIOException(e);
+        }
+    }
+
+    @Override
+    public CompletableFuture<R> executeRabbit(Q request, ExecutionContext executionContext) {
+        try {
+            var json = objectMapper.writeValueAsBytes(request);
+            org.springframework.amqp.core.Message rabbitRequest = new org.springframework.amqp.core.Message(json);
+            rabbitRequest.getMessageProperties().getHeaders().put(Headers.ACCESS_TOKEN, executionContext.jwt());
+            rabbitRequest.getMessageProperties().getHeaders().put(Headers.USER_ID, executionContext.userId());
+            rabbitRequest.getMessageProperties().setConsumerQueue(request.getChannel());
+
+            org.springframework.amqp.core.Message rabbitResponse = rabbitTemplate.sendAndReceive(rabbitRequest);
+
+            CompletableFuture<R> replyHandler = new CompletableFuture<>();
+
+            assert rabbitResponse != null;
+            var error = (String) rabbitResponse.getMessageProperties().getHeaders().get(Headers.ERROR);
+            if (error != null) {
+                var executionException = objectMapper.readValue(error, CommandExecutionException.class);
+                replyHandler.completeExceptionally(executionException);
+            }
+            else {
+                var response = objectMapper.readValue(rabbitResponse.getBody(), responseClass);
+                logger.info("ALEX raspund la reply handler {} cu response {}", replyHandler, response);
+                replyHandler.complete(response);
+            }
+            return replyHandler;
+        } catch (Exception e) {
+            logger.error("Error ", e);
+            throw new RuntimeException(e);
         }
     }
 
