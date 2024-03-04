@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 
 import javax.annotation.PreDestroy;
 import java.io.IOException;
@@ -54,6 +55,7 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
     private ObjectMapper objectMapper;
 
     @Autowired
+    @Lazy
     private RabbitTemplate rabbitTemplate;
 
     private Producer<byte[]> producer;
@@ -118,9 +120,8 @@ public class PulsarCommandExecutor<Q extends Request<R>, R extends Response> imp
             org.springframework.amqp.core.Message rabbitRequest = new org.springframework.amqp.core.Message(json);
             rabbitRequest.getMessageProperties().getHeaders().put(Headers.ACCESS_TOKEN, executionContext.jwt());
             rabbitRequest.getMessageProperties().getHeaders().put(Headers.USER_ID, executionContext.userId());
-            rabbitRequest.getMessageProperties().setConsumerQueue(request.getChannel());
-
-            org.springframework.amqp.core.Message rabbitResponse = rabbitTemplate.sendAndReceive(rabbitRequest);
+            rabbitRequest.getMessageProperties().getHeaders().put(Headers.METHOD, request.getChannel());
+            org.springframework.amqp.core.Message rabbitResponse = rabbitTemplate.sendAndReceive(request.getChannel(), rabbitRequest);
 
             CompletableFuture<R> replyHandler = new CompletableFuture<>();
 

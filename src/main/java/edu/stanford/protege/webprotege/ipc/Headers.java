@@ -22,4 +22,6 @@ public class Headers {
     public static final String PROJECT_ID = PREFIX + "projectId";
 
     public static final String ACCESS_TOKEN = PREFIX + "accessToken";
+
+    public static final String METHOD = PREFIX + "methodName";
 }

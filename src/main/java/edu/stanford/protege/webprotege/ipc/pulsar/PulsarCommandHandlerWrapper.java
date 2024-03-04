@@ -195,7 +195,7 @@ public class PulsarCommandHandlerWrapper<Q extends Request<R>, R extends Respons
                                                             subject,
                                                             requiredActionId.stream().findFirst().orElse(null));
         var executionContext = new ExecutionContext(new UserId(userId), "");
-        var authResponseFuture = authorizationStatusExecutor.executeRabbit(authRequest, executionContext);
+        var authResponseFuture = authorizationStatusExecutor.execute(authRequest, executionContext);
         authResponseFuture.whenComplete((authResponse, authError) -> {
             if (authError != null) {
                 // The call to the authorization service failed
