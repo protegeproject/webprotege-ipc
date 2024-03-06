@@ -6,13 +6,9 @@ import com.fasterxml.jackson.annotation.JsonTypeName;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.common.UserId;
-import edu.stanford.protege.webprotege.ipc.pulsar.PulsarCommandExecutor;
-import org.apache.pulsar.client.admin.PulsarAdminException;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.junit.jupiter.api.AfterEach;
+import edu.stanford.protege.webprotege.ipc.impl.CommandExecutorImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -22,7 +18,6 @@ import org.springframework.test.annotation.DirtiesContext;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Nonnull;
-import java.io.IOException;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -36,9 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 2021-08-03
  */
 @SpringBootTest
-@ExtendWith(PulsarTestExtension.class)
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
-public class CommandExecutor_CommandHandler_Test {
+public class CommandExecutor_CommandHandler_Test extends IntegrationTestsExtension {
 
     @Autowired
     CommandExecutor<TestRequest, TestResponse> executor;
@@ -46,18 +40,10 @@ public class CommandExecutor_CommandHandler_Test {
     @Autowired
     ApplicationContext applicationContext;
 
-    @Autowired
-    PulsarClient pulsarClient;
-
     @BeforeEach
     void setUp() {
 
     }
-
-    @AfterEach
-    void tearDown() throws PulsarAdminException {
-    }
-
 
     @Test
     void shouldAutowireCommandExecutor() {
@@ -65,7 +51,7 @@ public class CommandExecutor_CommandHandler_Test {
     }
 
     @Test
-    void shouldSendAndReceivedCommand() throws IOException, ExecutionException, InterruptedException, TimeoutException {
+    void shouldSendAndReceivedCommand() throws  ExecutionException, InterruptedException, TimeoutException {
         var id = UUID.randomUUID().toString();
         var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"),
                                                                                 "access-token-value"));
@@ -83,7 +69,7 @@ public class CommandExecutor_CommandHandler_Test {
          */
         @Bean
         CommandExecutor<TestRequest, TestResponse> commandExecutor() {
-            return new PulsarCommandExecutor<>(TestResponse.class);
+            return new CommandExecutorImpl<>(TestResponse.class);
         }
 
         @Bean

@@ -1,4 +1,4 @@
-package edu.stanford.protege.webprotege.ipc.pulsar;
+package edu.stanford.protege.webprotege.ipc.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -15,21 +15,21 @@ import edu.stanford.protege.webprotege.ipc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
-import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpStatus;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 
 import static edu.stanford.protege.webprotege.ipc.Headers.*;
-import static edu.stanford.protege.webprotege.ipc.pulsar.RabbitMqConfiguration.RPC_EXCHANGE;
+import static edu.stanford.protege.webprotege.ipc.impl.RabbitMqConfiguration.COMMANDS_EXCHANGE;
 
-public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> implements ChannelAwareMessageListener {
+public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Response> implements ChannelAwareMessageListener {
 
-    private final static Logger logger = LoggerFactory.getLogger(RabbitMqHandlerWrapper.class);
+    private final static Logger logger = LoggerFactory.getLogger(RabbitMqCommandHandlerWrapper.class);
 
     private final List<CommandHandler<? extends Request, ? extends Response>> handlers;
 
@@ -37,9 +37,9 @@ public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> i
     private final ObjectMapper objectMapper;
     private final CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
-    public RabbitMqHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> commandHandlers,
-                                  ObjectMapper objectMapper,
-                                  CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
+    public RabbitMqCommandHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> commandHandlers,
+                                         ObjectMapper objectMapper,
+                                         CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
         this.handlers = commandHandlers;
         this.objectMapper = objectMapper;
         this.authorizationStatusExecutor = authorizationStatusExecutor;
@@ -48,9 +48,6 @@ public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> i
     @Override
     public void onMessage(Message message, Channel channel) throws Exception {
         logger.info("Received message " + message);
-
-
-    
 
         var replyChannel = message.getMessageProperties().getReplyTo();
         if (replyChannel == null) {
@@ -106,8 +103,7 @@ public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> i
 
     private void parseAndHandleRequest(CommandHandler<Q,R> handler, Message message, Channel channel, UserId userId, String accessToken) {
         try {
-            var payload = message.getBody();
-            var request = objectMapper.readValue(payload, handler.getRequestClass());
+            var request = objectMapper.readValue( message.getBody(), handler.getRequestClass());
             // The request has successfully been read.  All required headers are present and the request body
             // is well-formed so acknowledge the request (i.e. it shouldn't be dead-lettered)
             if (handler instanceof AuthorizedCommandHandler<Q, R> authorizedCommandHandler) {
@@ -144,7 +140,7 @@ public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> i
                 subject,
                 requiredActionId.stream().findFirst().orElse(null));
         var executionContext = new ExecutionContext(userId, "");
-        var authResponseFuture = authorizationStatusExecutor.executeRabbit(authRequest, executionContext);
+        var authResponseFuture = authorizationStatusExecutor.execute(authRequest, executionContext);
         authResponseFuture.whenComplete((authResponse, authError) -> {
             if (authError != null) {
                 // The call to the authorization service failed
@@ -201,15 +197,17 @@ public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> i
 
             var executionException = new CommandExecutionException(status);
             var value = serializeCommandExecutionException(executionException);
-
+            Map<String, Object> headersMap = new HashMap<>();
+            headersMap.put(ERROR, String.valueOf(value));
+            headersMap.put(USER_ID, String.valueOf(userId.id()));
             AMQP.BasicProperties replyProps = new AMQP.BasicProperties
                     .Builder()
                     .correlationId(message.getMessageProperties().getCorrelationId())
+                    .headers(headersMap)
                     .build();
 
-            replyProps.getHeaders().put(ERROR, value);
-            replyProps.getHeaders().put(USER_ID, userId);
-            channel.basicPublish(RPC_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
+
+            channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
         } catch (Exception e){
             logger.error("Am erroare ", e);
         }
@@ -219,12 +217,11 @@ public class RabbitMqHandlerWrapper <Q extends Request<R>, R extends Response> i
         try {
 
             var value = objectMapper.writeValueAsBytes(response);
-            logger.info("ALEX reply pe topic {} cu {}",message.getMessageProperties().getReplyTo(), objectMapper.writeValueAsString(response));
             AMQP.BasicProperties replyProps = new AMQP.BasicProperties
                     .Builder()
                     .correlationId(message.getMessageProperties().getCorrelationId())
                     .build();
-            channel.basicPublish(RPC_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value);
+            channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value);
         } catch (JsonProcessingException e) {
             logger.error("Am erroare ", e);
             replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);

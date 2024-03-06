@@ -1,28 +1,19 @@
-package edu.stanford.protege.webprotege.ipc.pulsar;
+package edu.stanford.protege.webprotege.ipc.impl;
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonTypeName;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
-import edu.stanford.protege.webprotege.common.EventId;
 import edu.stanford.protege.webprotege.common.ProjectEvent;
 import edu.stanford.protege.webprotege.ipc.EventDispatcher;
-import edu.stanford.protege.webprotege.ipc.EventRecord;
-import edu.stanford.protege.webprotege.ipc.GenericEventHandler;
-import edu.stanford.protege.webprotege.ipc.Headers;
-import org.apache.pulsar.client.api.MessageId;
-import org.apache.pulsar.client.api.Producer;
-import org.apache.pulsar.client.api.PulsarClient;
-import org.apache.pulsar.client.api.PulsarClientException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageBuilder;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.context.annotation.Configuration;
 
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.Optional;
-import java.util.UUID;
 
 import static edu.stanford.protege.webprotege.ipc.Headers.*;
 
@@ -31,33 +22,42 @@ import static edu.stanford.protege.webprotege.ipc.Headers.*;
  * Stanford Center for Biomedical Informatics Research
  * 2022-02-03
  */
-public class PulsarEventDispatcher implements EventDispatcher {
+public class RabbitMQEventDispatcher implements EventDispatcher {
 
-    private static final Logger logger = LoggerFactory.getLogger(PulsarEventDispatcher.class);
+    private static final Logger logger = LoggerFactory.getLogger(RabbitMQEventDispatcher.class);
 
-    private final String applicationName;
-
-    private final PulsarProducersManager producersManager;
 
     private final ObjectMapper objectMapper;
 
-    private final String tenant;
+    private final RabbitTemplate eventRabbitTemplate;
 
-    public PulsarEventDispatcher(@Value("${spring.application.name}") String applicationName,
-                                 PulsarProducersManager producersManager,
-                                 ObjectMapper objectMapper,
-                                 @Value("${webprotege.pulsar.tenant}") String tenant) {
-        this.applicationName = applicationName;
-        this.producersManager = producersManager;
+
+    public RabbitMQEventDispatcher(ObjectMapper objectMapper,
+                                   RabbitTemplate eventRabbitTemplate) {
         this.objectMapper = objectMapper;
-        this.tenant = tenant;
+        this.eventRabbitTemplate = eventRabbitTemplate;
     }
 
     @Override
     public void dispatchEvent(Event event) {
-        createProducerAndDispatchEvent(event);
-    }
+        try {
+            var value = objectMapper.writeValueAsBytes(event);
+            Message message = MessageBuilder.withBody(value).build();
+            getJsonTypeName(event).ifPresent(typeName ->message.getMessageProperties().getHeaders().put(EVENT_TYPE, typeName));
+            message.getMessageProperties().getHeaders().put(CHANNEL, event.getChannel());
+            if(event instanceof ProjectEvent) {
+                var projectId = ((ProjectEvent) event).projectId().value();
+                message.getMessageProperties().getHeaders().put(PROJECT_ID, projectId);
+            }
+            eventRabbitTemplate.send(message);
+            logger.info("Sent event message");
+        } catch (JsonProcessingException e) {
+            logger.info("Could not serialize event: {}", e.getMessage(), e);
+        }
 
+    }
+/*
+    TODO remove this after everything regarding events is clear
     private void createProducerAndDispatchEvent(Event event) {
         var eventTopicUrl = tenant + "/" + PulsarNamespaces.EVENTS + "/" + event.getChannel();
         var producer = producersManager.getProducer(eventTopicUrl);
@@ -108,11 +108,7 @@ public class PulsarEventDispatcher implements EventDispatcher {
             logger.error("Could not send event message", e);
         }
     }
-
-    private String getProducerName(Event event) {
-        return applicationName + "--" + event.getChannel() + "--event-producer";
-    }
-
+    */
     private Optional<String> getJsonTypeName(Event event) {
         var annotation = event.getClass().getAnnotation(JsonTypeName.class);
         return Optional.ofNullable(annotation).map(JsonTypeName::value);

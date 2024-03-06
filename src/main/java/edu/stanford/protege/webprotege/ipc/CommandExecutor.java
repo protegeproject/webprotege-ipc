@@ -12,7 +12,6 @@ import java.util.concurrent.CompletableFuture;
  */
 public interface CommandExecutor<Q extends Request<R>, R extends Response> {
 
-    CompletableFuture<R> execute(Q request, ExecutionContext executionContext);
 
-    CompletableFuture<R> executeRabbit(Q request, ExecutionContext executionContext);
+    CompletableFuture<R> execute(Q request, ExecutionContext executionContext);
 }

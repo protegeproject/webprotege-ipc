@@ -2,8 +2,6 @@
 <configuration>
     <include resource="org/springframework/boot/logging/logback/base.xml" />
     <logger name="*.ipc" level="info" />
-    <logger name="org.apache.pulsar.client.impl.ConsumerStatsRecorderImpl" level="warn" />
-    <logger name="org.apache.pulsar.client.impl.ProducerStatsRecorderImpl" level="warn" />
     <logger name="org.springframework.core " level="error" />
     <logger name="org.springframework.beans" level="error" />
     <logger name="org.springframework.context" level="error" />

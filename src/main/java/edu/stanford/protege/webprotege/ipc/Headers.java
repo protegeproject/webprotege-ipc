@@ -24,4 +24,6 @@ public class Headers {
     public static final String ACCESS_TOKEN = PREFIX + "accessToken";
 
     public static final String METHOD = PREFIX + "methodName";
+
+    public static final String CHANNEL = PREFIX + "channel";
 }
