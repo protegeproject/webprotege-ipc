@@ -77,8 +77,8 @@ public class RabbitMqConfiguration {
     }
 
     @Bean
-    DirectExchange exchange() {
-        return new DirectExchange(COMMANDS_EXCHANGE, true, false);
+    TopicExchange exchange() {
+        return new TopicExchange(COMMANDS_EXCHANGE, true, false);
     }
 
     @Bean
@@ -135,31 +135,32 @@ public class RabbitMqConfiguration {
     }
 
     @Bean
-    public List<Binding> bindings(DirectExchange directExchange, Queue msgQueue, Queue replyQueue) {
+    public List<Binding> bindings(TopicExchange topicExchange, Queue msgQueue, Queue replyQueue) {
+
+        var response = new ArrayList<Binding>();
         try (Connection connection = connectionFactory.createConnection();
              Channel channel = connection.createChannel(true)) {
-            channel.exchangeDeclare(COMMANDS_EXCHANGE, "direct", true);
+            channel.exchangeDeclare(COMMANDS_EXCHANGE, "topic", true);
             channel.queueDeclare(COMMANDS_QUEUE, true, false, false, null);
             channel.queueDeclare(COMMANDS_RESPONSE_QUEUE, true, false, false, null);
-
-            var response = new ArrayList<Binding>();
+            channel.basicQos(1);
 
             for (CommandHandler handler : commandHandlers) {
                 logger.info("Declaring binding queue {} to exchange {} with key {}", COMMANDS_QUEUE, COMMANDS_EXCHANGE, handler.getChannelName());
                 channel.queueBind(COMMANDS_QUEUE, COMMANDS_EXCHANGE, handler.getChannelName());
-                response.add(BindingBuilder.bind(msgQueue).to(directExchange).with(handler.getChannelName()));
+                response.add(BindingBuilder.bind(msgQueue).to(topicExchange).with(handler.getChannelName()));
             }
             channel.queueBind(COMMANDS_RESPONSE_QUEUE, COMMANDS_EXCHANGE, COMMANDS_RESPONSE_QUEUE);
 
-            response.add(BindingBuilder.bind(replyQueue).to(directExchange).with(replyQueue.getName()));
+            response.add(BindingBuilder.bind(replyQueue).to(topicExchange).with(replyQueue.getName()));
             channel.close();
             connection.close();
             return response;
 
         } catch (Exception e) {
-            logger.error("Error ", e);
-            throw new RuntimeException(e);
+            logger.error("Error initialize bindings", e);
         }
+        return response;
     }
 
     @Bean
@@ -176,7 +177,7 @@ public class RabbitMqConfiguration {
                 response.add(BindingBuilder.bind(eventsQueue).to(fanoutExchange));
             }
         } catch (IOException | TimeoutException e) {
-            throw new RuntimeException(e);
+            logger.error("Error initialize bindings", e);
         }
 
 
