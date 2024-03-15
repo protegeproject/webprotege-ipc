@@ -35,15 +35,13 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     private final List<CommandHandler<? extends Request, ? extends Response>> handlers;
 
-    private final AsyncRabbitTemplate asyncRabbitTemplate;
 
     private final ObjectMapper objectMapper;
 
     private final CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
-    public RabbitMqCommandHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> handlers, AsyncRabbitTemplate asyncRabbitTemplate, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
+    public RabbitMqCommandHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> handlers, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
         this.handlers = handlers;
-        this.asyncRabbitTemplate = asyncRabbitTemplate;
         this.objectMapper = objectMapper;
         this.authorizationStatusExecutor = authorizationStatusExecutor;
     }
@@ -215,7 +213,7 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
             channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
         } catch (Exception e){
-            logger.error("Am erroare ", e);
+            logger.error("Error replyWithErrorResponse ", e);
         }
     }
 
@@ -223,16 +221,15 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
         try {
             var value = objectMapper.writeValueAsBytes(response);
 
-            MessageBuilder messageBuilder = MessageBuilder.withBody(value);
+            AMQP.BasicProperties replyProps = new AMQP.BasicProperties
+                    .Builder()
+                    .correlationId(message.getMessageProperties().getCorrelationId())
+                    .build();
 
-            Message replyMessage = messageBuilder.copyProperties(message.getMessageProperties()).build();
-
-            asyncRabbitTemplate.sendAndReceive(message.getMessageProperties().getReplyTo(), replyMessage);
-        } catch (JsonProcessingException e) {
-            logger.error("Am erroare ", e);
+            channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value);
+        } catch (Exception e) {
+            logger.error("Error handling replyWithSuccessResponse ", e);
             replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
-        } catch (Exception e){
-            logger.error("Am erroare ", e);
         }
     }
 

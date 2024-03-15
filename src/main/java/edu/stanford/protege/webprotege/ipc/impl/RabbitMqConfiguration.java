@@ -153,16 +153,16 @@ public class RabbitMqConfiguration {
     }
 
     @Bean
-    public RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper(AsyncRabbitTemplate asyncRabbitTemplate){
-       return new RabbitMqCommandHandlerWrapper<>(handlers, asyncRabbitTemplate, objectMapper, authorizationStatusExecutor);
+    public RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper(){
+       return new RabbitMqCommandHandlerWrapper<>(handlers, objectMapper, authorizationStatusExecutor);
     }
 
     @Bean
-    public SimpleMessageListenerContainer messageListenerContainers(AsyncRabbitTemplate asyncRabbitTemplate) {
+    public SimpleMessageListenerContainer messageListenerContainers() {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setQueueNames(getCommandQueue());
         container.setConnectionFactory(connectionFactory);
-        container.setMessageListener(rabbitMqCommandHandlerWrapper(asyncRabbitTemplate));
+        container.setMessageListener(rabbitMqCommandHandlerWrapper());
         return container;
     }
 
