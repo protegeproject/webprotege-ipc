@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
 
 import java.util.Optional;
@@ -33,7 +34,7 @@ public class RabbitMQEventDispatcher implements EventDispatcher {
 
 
     public RabbitMQEventDispatcher(ObjectMapper objectMapper,
-                                   RabbitTemplate eventRabbitTemplate) {
+                                   @Qualifier("eventRabbitTemplate") RabbitTemplate eventRabbitTemplate) {
         this.objectMapper = objectMapper;
         this.eventRabbitTemplate = eventRabbitTemplate;
     }

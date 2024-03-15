@@ -15,6 +15,8 @@ import edu.stanford.protege.webprotege.ipc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageBuilder;
+import org.springframework.amqp.rabbit.AsyncRabbitTemplate;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
 import org.springframework.http.HttpStatus;
 
@@ -33,14 +35,15 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     private final List<CommandHandler<? extends Request, ? extends Response>> handlers;
 
+    private final AsyncRabbitTemplate asyncRabbitTemplate;
 
     private final ObjectMapper objectMapper;
+
     private final CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
-    public RabbitMqCommandHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> commandHandlers,
-                                         ObjectMapper objectMapper,
-                                         CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
-        this.handlers = commandHandlers;
+    public RabbitMqCommandHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> handlers, AsyncRabbitTemplate asyncRabbitTemplate, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
+        this.handlers = handlers;
+        this.asyncRabbitTemplate = asyncRabbitTemplate;
         this.objectMapper = objectMapper;
         this.authorizationStatusExecutor = authorizationStatusExecutor;
     }
@@ -87,6 +90,7 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
         }
 
         CommandHandler handler = extractHandler(messageType);
+        logger.info("Dispatch handling to {}", handler.getClass());
         parseAndHandleRequest(handler, message, channel, new UserId(userId), accessToken);
     }
 
@@ -120,9 +124,11 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
     }
 
     private CommandHandler<? extends Request, ? extends Response> extractHandler(String messageType){
-        return this.handlers.stream().filter(handler -> handler.getChannelName().equalsIgnoreCase(messageType))
+        return this.handlers.stream().filter(handler -> {
+                    return handler.getChannelName().equalsIgnoreCase(messageType);
+                } )
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Invalid message type" + messageType));
+                .orElseThrow(() -> new RuntimeException("Invalid message type " + messageType));
     }
 
     private void authorizeAndReplyToRequest(CommandHandler<Q,R> handler,
@@ -215,13 +221,13 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     private void replyWithSuccessResponse(Channel channel, Message message, UserId userId, R response) {
         try {
-
             var value = objectMapper.writeValueAsBytes(response);
-            AMQP.BasicProperties replyProps = new AMQP.BasicProperties
-                    .Builder()
-                    .correlationId(message.getMessageProperties().getCorrelationId())
-                    .build();
-            channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value);
+
+            MessageBuilder messageBuilder = MessageBuilder.withBody(value);
+
+            Message replyMessage = messageBuilder.copyProperties(message.getMessageProperties()).build();
+
+            asyncRabbitTemplate.sendAndReceive(message.getMessageProperties().getReplyTo(), replyMessage);
         } catch (JsonProcessingException e) {
             logger.error("Am erroare ", e);
             replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);

@@ -9,22 +9,27 @@ import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.ipc.CommandExecutor;
+import org.springframework.context.ApplicationContext;
 import edu.stanford.protege.webprotege.ipc.CommandHandler;
 import edu.stanford.protege.webprotege.ipc.EventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.AsyncRabbitTemplate;
 import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 
+import javax.annotation.PostConstruct;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeoutException;
@@ -34,10 +39,28 @@ public class RabbitMqConfiguration {
 
     private final static Logger logger = LoggerFactory.getLogger(RabbitMqConfiguration.class);
 
+    private final static String ipAddress;
+
+    static {
+        try {
+            ipAddress = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     @Value("${webprotege.rabbitmq.responsequeue}")
     public String COMMANDS_RESPONSE_QUEUE;
+
+    private String getCommandResponseQueue() {
+        return COMMANDS_RESPONSE_QUEUE  + ipAddress;
+    }
     @Value("${webprotege.rabbitmq.requestqueue}")
     public String COMMANDS_QUEUE;
+
+    private String getCommandQueue(){
+        return COMMANDS_QUEUE ;
+    }
 
     public static final String COMMANDS_EXCHANGE = "webprotege-exchange";
 
@@ -49,26 +72,30 @@ public class RabbitMqConfiguration {
     private ConnectionFactory connectionFactory;
 
     @Autowired(required = false)
-    private List<CommandHandler<? extends Request, ? extends Response>> commandHandlers = new ArrayList<>();
+    private List<EventHandler<? extends Event>> eventHandlers = new ArrayList<>();
+
 
     @Autowired(required = false)
-    private List<EventHandler<? extends Event>> eventHandlers = new ArrayList<>();
+    private List<CommandHandler<? extends Request, ? extends Response>> handlers;
+
+
+    @Autowired
+    private ApplicationContext applicationContext;
 
     @Autowired
     private ObjectMapper objectMapper;
 
     @Autowired
-    @Lazy
-    CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
+    private CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
     @Bean
     Queue msgQueue() {
-        return new Queue(COMMANDS_QUEUE, true);
+        return new Queue(getCommandQueue(), true);
     }
 
     @Bean
     Queue replyQueue() {
-        return new Queue(COMMANDS_RESPONSE_QUEUE, true);
+        return new Queue(getCommandResponseQueue(), true);
     }
 
     @Bean
@@ -77,8 +104,8 @@ public class RabbitMqConfiguration {
     }
 
     @Bean
-    TopicExchange exchange() {
-        return new TopicExchange(COMMANDS_EXCHANGE, true, false);
+    DirectExchange exchange() {
+        return new DirectExchange(COMMANDS_EXCHANGE, true, false);
     }
 
     @Bean
@@ -86,19 +113,20 @@ public class RabbitMqConfiguration {
         return new FanoutExchange(EVENT_EXCHANGE, true, false);
     }
 
+   @Bean(name = "rabbitTemplate")
+   public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+       RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
+       rabbitTemplate.setReplyTimeout(60000);
+       rabbitTemplate.setExchange(COMMANDS_EXCHANGE);
+       return rabbitTemplate;
+   }
 
-
-    @Bean
-    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
-        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-        rabbitTemplate.setReplyAddress(COMMANDS_RESPONSE_QUEUE);
-        rabbitTemplate.setReplyTimeout(60000);
-        rabbitTemplate.setExchange(COMMANDS_EXCHANGE);
-        rabbitTemplate.setUseDirectReplyToContainer(false);
-        return rabbitTemplate;
+    @Bean(name = "asyncRabbitTemplate")
+    public AsyncRabbitTemplate asyncRabbitTemplate(@Qualifier("rabbitTemplate") RabbitTemplate rabbitTemplate, SimpleMessageListenerContainer replyListenerContainer) {
+        return new AsyncRabbitTemplate(rabbitTemplate, replyListenerContainer, getCommandResponseQueue());
     }
 
-    @Bean
+    @Bean(name = "eventRabbitTemplate")
     public RabbitTemplate eventRabbitTemplate(ConnectionFactory connectionFactory) {
         RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
         rabbitTemplate.setReplyTimeout(60000);
@@ -108,7 +136,7 @@ public class RabbitMqConfiguration {
     }
 
     @Bean
-    public SimpleMessageListenerContainer eventsListenerContainer(ConnectionFactory connectionFactory, Queue eventsQueue, RabbitTemplate eventRabbitTemplate) {
+    public SimpleMessageListenerContainer eventsListenerContainer(ConnectionFactory connectionFactory, Queue eventsQueue, @Qualifier("eventRabbitTemplate") RabbitTemplate eventRabbitTemplate) {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.setQueueNames(EVENT_QUEUE);
@@ -117,50 +145,25 @@ public class RabbitMqConfiguration {
     }
 
     @Bean
-    public SimpleMessageListenerContainer replyListenerContainer(ConnectionFactory connectionFactory, Queue replyQueue, RabbitTemplate rabbitTemplate) {
+    public SimpleMessageListenerContainer replyListenerContainer(ConnectionFactory connectionFactory, Queue replyQueue) {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.setQueues(replyQueue);
-        container.setMessageListener(rabbitTemplate);
         return container;
     }
 
     @Bean
-    public SimpleMessageListenerContainer messageListenerContainers(ConnectionFactory connectionFactory) {
+    public RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper(AsyncRabbitTemplate asyncRabbitTemplate){
+       return new RabbitMqCommandHandlerWrapper<>(handlers, asyncRabbitTemplate, objectMapper, authorizationStatusExecutor);
+    }
+
+    @Bean
+    public SimpleMessageListenerContainer messageListenerContainers(AsyncRabbitTemplate asyncRabbitTemplate) {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
-        container.setQueueNames(COMMANDS_QUEUE);
+        container.setQueueNames(getCommandQueue());
         container.setConnectionFactory(connectionFactory);
-        container.setMessageListener(new RabbitMqCommandHandlerWrapper<>(commandHandlers, objectMapper, authorizationStatusExecutor));
+        container.setMessageListener(rabbitMqCommandHandlerWrapper(asyncRabbitTemplate));
         return container;
-    }
-
-    @Bean
-    public List<Binding> bindings(TopicExchange topicExchange, Queue msgQueue, Queue replyQueue) {
-
-        var response = new ArrayList<Binding>();
-        try (Connection connection = connectionFactory.createConnection();
-             Channel channel = connection.createChannel(true)) {
-            channel.exchangeDeclare(COMMANDS_EXCHANGE, "topic", true);
-            channel.queueDeclare(COMMANDS_QUEUE, true, false, false, null);
-            channel.queueDeclare(COMMANDS_RESPONSE_QUEUE, true, false, false, null);
-            channel.basicQos(1);
-
-            for (CommandHandler handler : commandHandlers) {
-                logger.info("Declaring binding queue {} to exchange {} with key {}", COMMANDS_QUEUE, COMMANDS_EXCHANGE, handler.getChannelName());
-                channel.queueBind(COMMANDS_QUEUE, COMMANDS_EXCHANGE, handler.getChannelName());
-                response.add(BindingBuilder.bind(msgQueue).to(topicExchange).with(handler.getChannelName()));
-            }
-            channel.queueBind(COMMANDS_RESPONSE_QUEUE, COMMANDS_EXCHANGE, COMMANDS_RESPONSE_QUEUE);
-
-            response.add(BindingBuilder.bind(replyQueue).to(topicExchange).with(replyQueue.getName()));
-            channel.close();
-            connection.close();
-            return response;
-
-        } catch (Exception e) {
-            logger.error("Error initialize bindings", e);
-        }
-        return response;
     }
 
     @Bean
@@ -184,5 +187,24 @@ public class RabbitMqConfiguration {
         return response;
     }
 
+    @PostConstruct
+    public void  createBindings() {
+        try (Connection connection = connectionFactory.createConnection();
+             Channel channel = connection.createChannel(true)) {
+            channel.exchangeDeclare(COMMANDS_EXCHANGE, "direct", true);
+            channel.queueDeclare(getCommandQueue(), true, false, false, null);
+            channel.queueDeclare(getCommandResponseQueue(), true, false, false, null);
+            channel.basicQos(1);
+
+            for (CommandHandler handler : handlers) {
+                logger.info("Declaring binding queue {} to exchange {} with key {}", getCommandQueue(), COMMANDS_EXCHANGE, handler.getChannelName());
+                channel.queueBind(getCommandQueue(), COMMANDS_EXCHANGE, handler.getChannelName());
+            }
+            channel.queueBind(getCommandResponseQueue(), COMMANDS_EXCHANGE, getCommandResponseQueue());
+
+        } catch (Exception e) {
+            logger.error("Error initialize bindings", e);
+        }
+    }
 
 }
