@@ -1,7 +1,6 @@
 package edu.stanford.protege.webprotege.ipc;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.json.AutoConfigureJsonTesters;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -19,10 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 2021-09-01
  */
 @SpringBootTest
-@ExtendWith(PulsarTestExtension.class)
 @AutoConfigureJsonTesters
 @ContextConfiguration(classes = WebProtegeIpcApplication.class)
-public class CommandExecutionException_Tests {
+public class CommandExecutionException_Tests extends IntegrationTestsExtension {
 
     @Autowired
     private JacksonTester<CommandExecutionException> tester;
