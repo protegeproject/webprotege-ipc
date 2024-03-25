@@ -167,6 +167,7 @@ public class RabbitMqConfiguration {
             }
         } catch (IOException | TimeoutException e) {
             logger.error("Error initialize bindings", e);
+            throw new RuntimeException("Error initialize bindings", e);
         }
 
 
@@ -190,6 +191,7 @@ public class RabbitMqConfiguration {
 
         } catch (IOException |TimeoutException e) {
             logger.error("Error initialize bindings", e);
+            throw new RuntimeException("Error initialize bindings", e);
         }
     }
 
