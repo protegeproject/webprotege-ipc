@@ -62,7 +62,7 @@ public class RabbitMqConfiguration {
 
 
     @Autowired(required = false)
-    private List<CommandHandler<? extends Request, ? extends Response>> handlers;
+    private List<CommandHandler<? extends Request, ? extends Response>> handlers = new ArrayList<>();
 
 
     @Autowired
@@ -188,7 +188,7 @@ public class RabbitMqConfiguration {
             }
             channel.queueBind(getCommandResponseQueue(), COMMANDS_EXCHANGE, getCommandResponseQueue());
 
-        } catch (Exception e) {
+        } catch (IOException |TimeoutException e) {
             logger.error("Error initialize bindings", e);
         }
     }
