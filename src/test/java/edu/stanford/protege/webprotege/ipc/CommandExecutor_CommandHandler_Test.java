@@ -31,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 2021-08-03
  */
 @SpringBootTest
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class CommandExecutor_CommandHandler_Test extends IntegrationTestsExtension {
 
     @Autowired

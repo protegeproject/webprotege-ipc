@@ -1,9 +1,12 @@
 package edu.stanford.protege.webprotege.ipc;
 
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.RabbitMQContainer;
@@ -21,6 +24,7 @@ import java.time.Duration;
 @SpringBootTest(properties = {"spring.mongodb.embedded.version=5.0.6"})
 @AutoConfigureWebTestClient
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 public class IntegrationTestsExtension {
 
     private static Logger logger = LoggerFactory.getLogger(IntegrationTestsExtension.class);
@@ -35,5 +39,15 @@ public class IntegrationTestsExtension {
     static void configure(DynamicPropertyRegistry registry) {
         registry.add("spring.rabbitmq.host", rabbitContainer::getHost);
         registry.add("spring.rabbitmq.port", rabbitContainer::getAmqpPort);
+    }
+
+    @BeforeAll
+    public static void containerSetUp(){
+        rabbitContainer.start();
+    }
+
+    @AfterAll
+    public static void  containerTearDown(){
+        rabbitContainer.stop();
     }
 }

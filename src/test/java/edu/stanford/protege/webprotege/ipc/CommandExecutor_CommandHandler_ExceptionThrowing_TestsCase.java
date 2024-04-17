@@ -31,7 +31,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * 2022-02-09
  */
 @SpringBootTest
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends IntegrationTestsExtension {
 
     @Autowired

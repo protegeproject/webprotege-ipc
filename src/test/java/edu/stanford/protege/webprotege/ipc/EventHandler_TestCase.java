@@ -10,6 +10,7 @@ import org.mockito.Captor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.test.context.TestPropertySource;
 
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -25,6 +26,7 @@ import static org.mockito.Mockito.verify;
  * 2022-02-08
  */
 @SpringBootTest(classes = WebProtegeIpcApplication.class)
+@TestPropertySource(properties = "webprotege.rabbitmq.event-subscribe=true")
 public class EventHandler_TestCase extends IntegrationTestsExtension {
     public static CountDownLatch countDownLatch;
 
