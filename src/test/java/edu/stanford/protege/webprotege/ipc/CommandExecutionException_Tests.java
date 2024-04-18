@@ -7,6 +7,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.json.JacksonTester;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.TestPropertySource;
 
 import java.io.IOException;
 
@@ -20,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @SpringBootTest
 @AutoConfigureJsonTesters
 @ContextConfiguration(classes = WebProtegeIpcApplication.class)
+@TestPropertySource(properties = "webprotege.rabbitmq.commands-subscribe=false")
 public class CommandExecutionException_Tests extends IntegrationTestsExtension {
 
     @Autowired

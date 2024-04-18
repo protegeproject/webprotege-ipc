@@ -8,6 +8,7 @@ import edu.stanford.protege.webprotege.common.ProjectEvent;
 import edu.stanford.protege.webprotege.ipc.EventDispatcher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -49,9 +50,9 @@ public class RabbitMQEventDispatcher implements EventDispatcher {
                 var projectId = ((ProjectEvent) event).projectId().value();
                 message.getMessageProperties().getHeaders().put(PROJECT_ID, projectId);
             }
-            eventRabbitTemplate.send(message);
-            logger.info("Sent event message");
-        } catch (JsonProcessingException e) {
+            eventRabbitTemplate.convertAndSend(RabbitMQEventsConfiguration.EVENT_EXCHANGE, "", message);
+            logger.info("Sent event message!");
+        } catch (JsonProcessingException | AmqpException e) {
             logger.info("Could not serialize event: {}", e.getMessage(), e);
         }
 

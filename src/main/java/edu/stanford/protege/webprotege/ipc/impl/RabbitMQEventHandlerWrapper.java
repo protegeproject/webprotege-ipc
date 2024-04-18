@@ -32,7 +32,7 @@ public class RabbitMQEventHandlerWrapper<T extends Event> implements MessageList
         EventHandler eventHandler = eventHandlers.stream()
                 .filter(handler -> {
                     String channel = String.valueOf(message.getMessageProperties().getHeaders().get(CHANNEL));
-                    return handler.getChannelName().equals(channel);
+                    return channel.contains(handler.getChannelName());
                 }).findFirst()
                 .orElse(null);
         if(eventHandler != null) {
