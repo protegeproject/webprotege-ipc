@@ -141,7 +141,7 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
         var authRequest = new GetAuthorizationStatusRequest(resource,
                 subject,
                 requiredActionId.stream().findFirst().orElse(null));
-        var executionContext = new ExecutionContext(userId, "");
+        var executionContext = new ExecutionContext(userId, accessToken);
         var authResponseFuture = authorizationStatusExecutor.execute(authRequest, executionContext);
         authResponseFuture.whenComplete((authResponse, authError) -> {
             if (authError != null) {
