@@ -1,6 +1,7 @@
 package edu.stanford.protege.webprotege.ipc.impl;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Component;
 
 /**
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Component;
  * Stanford Center for Biomedical Informatics Research
  * 2024-05-11
  */
-@Component
+@Configuration
 @ConfigurationProperties(prefix = "webprotege.rabbitmq")
 public class RabbitMqProperties {
 
