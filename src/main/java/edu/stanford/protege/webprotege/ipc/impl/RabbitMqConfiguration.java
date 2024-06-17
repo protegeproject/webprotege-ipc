@@ -94,7 +94,11 @@ public class RabbitMqConfiguration {
     @Bean(name = "asyncRabbitTemplate")
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
     public AsyncRabbitTemplate asyncRabbitTemplate(@Qualifier("rabbitTemplate") RabbitTemplate rabbitTemplate, SimpleMessageListenerContainer replyListenerContainer) {
-        return new AsyncRabbitTemplate(rabbitTemplate, replyListenerContainer, getCommandResponseQueue());
+        var asyncRabbitTemplate = new AsyncRabbitTemplate(rabbitTemplate,
+                                                          replyListenerContainer,
+                                                          getCommandResponseQueue());
+        asyncRabbitTemplate.setReceiveTimeout(rabbitMqTimeout);
+        return asyncRabbitTemplate;
     }
 
 
