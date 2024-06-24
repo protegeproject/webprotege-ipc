@@ -86,7 +86,7 @@ public class RabbitMqConfiguration {
    @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-       rabbitTemplate.setReplyTimeout(rabbitMqTimeout);
+       rabbitTemplate.setReplyTimeout(120000);
        rabbitTemplate.setExchange(COMMANDS_EXCHANGE);
        return rabbitTemplate;
    }
@@ -94,7 +94,9 @@ public class RabbitMqConfiguration {
     @Bean(name = "asyncRabbitTemplate")
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
     public AsyncRabbitTemplate asyncRabbitTemplate(@Qualifier("rabbitTemplate") RabbitTemplate rabbitTemplate, SimpleMessageListenerContainer replyListenerContainer) {
-        return new AsyncRabbitTemplate(rabbitTemplate, replyListenerContainer, getCommandResponseQueue());
+        AsyncRabbitTemplate response = new AsyncRabbitTemplate(rabbitTemplate, replyListenerContainer, getCommandResponseQueue());
+        response.setReceiveTimeout(120000);
+        return response;
     }
 
 
@@ -105,6 +107,7 @@ public class RabbitMqConfiguration {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.setQueues(replyQueue);
+        container.setConcurrency("15-20");
         return container;
     }
 
@@ -121,6 +124,7 @@ public class RabbitMqConfiguration {
         container.setQueueNames(getCommandQueue());
         container.setConnectionFactory(connectionFactory);
         container.setMessageListener(rabbitMqCommandHandlerWrapper());
+        container.setConcurrency("15-20");
         return container;
     }
 

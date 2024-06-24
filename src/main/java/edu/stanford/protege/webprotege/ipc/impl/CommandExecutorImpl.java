@@ -65,7 +65,7 @@ public class CommandExecutorImpl<Q extends Request<R>, R extends Response> imple
 
         if(exception != null) {
             try {
-                logger.error("Found error on response " + exception);
+                logger.error("Found error on response {}. Action : {}" ,exception, rabbitResponse.getMessageProperties().getHeaders().get(Headers.METHOD));
                 throw objectMapper.readValue(exception, CommandExecutionException.class);
             } catch (JsonProcessingException e) {
                 logger.error("Error ", e);
