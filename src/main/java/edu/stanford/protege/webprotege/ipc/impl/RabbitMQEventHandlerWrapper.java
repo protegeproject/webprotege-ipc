@@ -28,7 +28,6 @@ public class RabbitMQEventHandlerWrapper<T extends Event> implements MessageList
 
     @Override
     public void onMessage(Message message) {
-        logger.info("Handling event with id {}", message.getMessageProperties().getMessageId());
         EventHandler eventHandler = eventHandlers.stream()
                 .filter(handler -> {
                     String channel = String.valueOf(message.getMessageProperties().getHeaders().get(CHANNEL));

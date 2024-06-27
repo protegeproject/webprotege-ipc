@@ -46,8 +46,6 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     @Override
     public void onMessage(Message message, Channel channel) throws Exception {
-        logger.info("Received message " + message);
-
         var replyChannel = message.getMessageProperties().getReplyTo();
         if (replyChannel == null) {
             String errorMessage = Headers.REPLY_CHANNEL + " header is missing.  Cannot reply to message.";
@@ -86,7 +84,6 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
         }
 
         CommandHandler handler = extractHandler(messageType);
-        logger.info("Dispatch handling to {}", handler.getClass());
         parseAndHandleRequest(handler, message, channel, new UserId(userId), accessToken);
     }
 
@@ -171,10 +168,15 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     private void handleAndReplyToRequest(CommandHandler<Q,R> handler, Channel channel, Message message, UserId userId, Q request, String accessToken) {
         var executionContext = new ExecutionContext(userId, accessToken);
+        long startTime = System.currentTimeMillis();
+
         try {
             var response = handler.handleRequest(request, executionContext);
             response.subscribe(r -> {
                 replyWithSuccessResponse(channel, message, userId, r);
+                long endtime = System.currentTimeMillis();
+                logger.info("Request executed " + request.getChannel() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
+
             }, throwable -> {
                 if (throwable instanceof CommandExecutionException ex) {
                     logger.info(
@@ -183,14 +185,23 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
                             throwable.getMessage(),
                             request);
                     replyWithErrorResponse(message,channel, userId, ex.getStatus());
+                    long endtime = System.currentTimeMillis();
+                    logger.info("Request failed " + request.getChannel() + "with error " + throwable.getMessage() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
                 }
                 else {
                     replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
+                    long endtime = System.currentTimeMillis();
+
+                    logger.info("Request failed " + request.getChannel() + "with error " + throwable.getMessage() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
+
                 }
             });
         } catch (Throwable throwable) {
             logger.error("Uncaught exception when handling request", throwable);
             replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
+            long endtime = System.currentTimeMillis();
+            logger.info("Request failed " + request.getChannel() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
+
         }
     }
 

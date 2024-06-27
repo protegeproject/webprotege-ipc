@@ -109,6 +109,7 @@ public class RabbitMqConfiguration {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.setQueues(replyQueue);
+        container.setConcurrency("15-20");
         return container;
     }
 
@@ -125,6 +126,7 @@ public class RabbitMqConfiguration {
         container.setQueueNames(getCommandQueue());
         container.setConnectionFactory(connectionFactory);
         container.setMessageListener(rabbitMqCommandHandlerWrapper());
+        container.setConcurrency("15-20");
         return container;
     }
 
