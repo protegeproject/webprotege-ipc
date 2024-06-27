@@ -86,7 +86,7 @@ public class RabbitMqConfiguration {
    @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
        RabbitTemplate rabbitTemplate = new RabbitTemplate(connectionFactory);
-       rabbitTemplate.setReplyTimeout(120000);
+       rabbitTemplate.setReplyTimeout(rabbitMqTimeout);
        rabbitTemplate.setExchange(COMMANDS_EXCHANGE);
        return rabbitTemplate;
    }
@@ -94,9 +94,11 @@ public class RabbitMqConfiguration {
     @Bean(name = "asyncRabbitTemplate")
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
     public AsyncRabbitTemplate asyncRabbitTemplate(@Qualifier("rabbitTemplate") RabbitTemplate rabbitTemplate, SimpleMessageListenerContainer replyListenerContainer) {
-        AsyncRabbitTemplate response = new AsyncRabbitTemplate(rabbitTemplate, replyListenerContainer, getCommandResponseQueue());
-        response.setReceiveTimeout(120000);
-        return response;
+        var asyncRabbitTemplate = new AsyncRabbitTemplate(rabbitTemplate,
+                                                          replyListenerContainer,
+                                                          getCommandResponseQueue());
+        asyncRabbitTemplate.setReceiveTimeout(rabbitMqTimeout);
+        return asyncRabbitTemplate;
     }
 
 
