@@ -51,7 +51,6 @@ public class RabbitMQEventDispatcher implements EventDispatcher {
                 message.getMessageProperties().getHeaders().put(PROJECT_ID, projectId);
             }
             eventRabbitTemplate.convertAndSend(RabbitMQEventsConfiguration.EVENT_EXCHANGE, "", message);
-            logger.info("Sent event message!");
         } catch (JsonProcessingException | AmqpException e) {
             logger.info("Could not serialize event: {}", e.getMessage(), e);
         }

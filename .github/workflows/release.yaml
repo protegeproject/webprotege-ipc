@@ -1,0 +1,48 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    if: ${{ github.actor != 'protegeproject-bot[bot]' }}
+    steps:
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.PROTEGEPROJECT_BOT_APP_ID }}
+          private-key: ${{ secrets.PROTEGEPROJECT_BOT_APP_PRIVATE_KEY }}
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ github.head_ref }}
+      - name: Set up JDK 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'adopt'
+          server-id: ossrh
+          server-username: OSSRH_USERNAME
+          server-password: OSSRH_TOKEN
+          gpg-private-key: ${{secrets.GPG_PRIVATE_KEY}}
+          gpg-passphrase: GPG_PASSPHRASE
+      - name: Bump version
+        id: bump
+        uses: mickem/gh-action-bump-maven-version@v1
+      - name: Build with Maven
+        run: mvn --batch-mode -Prelease deploy
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.bump.outputs.tag }}
+          generate_release_notes: true
+
+env:
+  GPG_PASSPHRASE: ${{secrets.GPG_PASSPHRASE}}
+  OSSRH_USERNAME: ${{secrets.OSSRH_USERNAME}}
+  OSSRH_TOKEN: ${{secrets.OSSRH_TOKEN}}
