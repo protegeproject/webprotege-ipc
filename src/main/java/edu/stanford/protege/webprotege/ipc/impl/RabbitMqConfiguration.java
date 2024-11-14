@@ -109,6 +109,7 @@ public class RabbitMqConfiguration {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
         container.setQueues(replyQueue);
+        container.setChannelTransacted(false);
         container.setConcurrency("15-20");
         return container;
     }
@@ -125,6 +126,7 @@ public class RabbitMqConfiguration {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setQueueNames(getCommandQueue());
         container.setConnectionFactory(connectionFactory);
+        container.setChannelTransacted(false);
         container.setMessageListener(rabbitMqCommandHandlerWrapper());
         container.setConcurrency("15-20");
         return container;
@@ -134,7 +136,7 @@ public class RabbitMqConfiguration {
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
     public void  createBindings() {
         try (Connection connection = connectionFactory.createConnection();
-             Channel channel = connection.createChannel(true)) {
+             Channel channel = connection.createChannel(false)) {
             channel.exchangeDeclare(COMMANDS_EXCHANGE, "direct", true);
             channel.queueDeclare(getCommandQueue(), true, false, false, null);
             channel.queueDeclare(getCommandResponseQueue(), true, false, false, null);
