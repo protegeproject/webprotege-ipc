@@ -49,7 +49,7 @@ public class CommandExecutorImpl<Q extends Request<R>, R extends Response> imple
             var json = objectMapper.writeValueAsBytes(request);
             org.springframework.amqp.core.Message rabbitRequest = new org.springframework.amqp.core.Message(json);
             rabbitRequest.getMessageProperties().getHeaders().put(Headers.ACCESS_TOKEN, executionContext.jwt());
-            rabbitRequest.getMessageProperties().getHeaders().put(Headers.USER_ID, executionContext.userId());
+            rabbitRequest.getMessageProperties().getHeaders().put(Headers.USER_ID, executionContext.userId().id());
             rabbitRequest.getMessageProperties().getHeaders().put(Headers.METHOD, request.getChannel());
 
             return asyncRabbitTemplate.sendAndReceive(request.getChannel(), rabbitRequest).thenApply(this::handleResponse);
