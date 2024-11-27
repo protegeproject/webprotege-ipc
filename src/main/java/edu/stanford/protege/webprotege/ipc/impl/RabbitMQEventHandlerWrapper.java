@@ -44,7 +44,12 @@ public class RabbitMQEventHandlerWrapper<T extends Event> implements MessageList
 
                 if(accessToken != null && !accessToken.isEmpty() && !"null".equalsIgnoreCase(accessToken)){
                     ExecutionContext executionContext = new ExecutionContext(UserId.valueOf(userId), accessToken);
-                    eventHandler.handleEvent(event, executionContext);
+                    try {
+                        eventHandler.handleEvent(event, executionContext);
+
+                    } catch (EventHandlerMethodNotImplemented e){
+                        eventHandler.handleEvent(event);
+                    }
                 } else {
                     eventHandler.handleEvent(event);
                 }

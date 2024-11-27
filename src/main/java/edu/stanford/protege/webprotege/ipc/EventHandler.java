@@ -1,7 +1,7 @@
 package edu.stanford.protege.webprotege.ipc;
 
 import edu.stanford.protege.webprotege.common.Event;
-import reactor.core.publisher.Mono;
+import edu.stanford.protege.webprotege.ipc.impl.EventHandlerMethodNotImplemented;
 
 import javax.annotation.Nonnull;
 
@@ -42,6 +42,6 @@ public interface EventHandler<E extends Event> {
      void handleEvent(E event);
 
      default void handleEvent(E event, ExecutionContext executionContext) {
-
+        throw new EventHandlerMethodNotImplemented("Method not implemented");
      }
 }
