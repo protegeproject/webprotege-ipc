@@ -42,7 +42,7 @@ public class RabbitMQEventHandlerWrapper<T extends Event> implements MessageList
                 var accessToken = String.valueOf(message.getMessageProperties().getHeaders().get(ACCESS_TOKEN));
                 var userId = (String) message.getMessageProperties().getHeaders().get(USER_ID);
 
-                if(accessToken != null && !accessToken.isEmpty()){
+                if(accessToken != null && !accessToken.isEmpty() && !"null".equalsIgnoreCase(accessToken)){
                     ExecutionContext executionContext = new ExecutionContext(UserId.valueOf(userId), accessToken);
                     eventHandler.handleEvent(event, executionContext);
                 } else {
