@@ -40,4 +40,8 @@ public interface EventHandler<E extends Event> {
      * @param event The event to be handled
      */
      void handleEvent(E event);
+
+     default void handleEvent(E event, ExecutionContext executionContext) {
+
+     }
 }
