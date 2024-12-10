@@ -8,5 +8,7 @@ import edu.stanford.protege.webprotege.common.Event;
  * 2022-01-31
  */
 public interface EventDispatcher {
+    void dispatchEvent(Event event, ExecutionContext executionContext);
+
     void dispatchEvent(Event event);
 }

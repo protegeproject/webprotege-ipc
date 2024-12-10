@@ -33,4 +33,9 @@ public class TestEventHandler implements EventHandler<TestEvent>{
         logger.info("Handling event " + event);
         EventHandler_TestCase.countDownLatch.countDown();
     }
+
+    @Override
+    public void handleEvent(TestEvent event, ExecutionContext executionContext) {
+
+    }
 }

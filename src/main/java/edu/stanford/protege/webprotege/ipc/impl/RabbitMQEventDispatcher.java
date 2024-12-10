@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.common.ProjectEvent;
 import edu.stanford.protege.webprotege.ipc.EventDispatcher;
+import edu.stanford.protege.webprotege.ipc.ExecutionContext;
+import edu.stanford.protege.webprotege.ipc.Headers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
@@ -40,12 +42,18 @@ public class RabbitMQEventDispatcher implements EventDispatcher {
     }
 
     @Override
-    public void dispatchEvent(Event event) {
+    public void dispatchEvent(Event event, ExecutionContext executionContext) {
         try {
             var value = objectMapper.writeValueAsBytes(event);
             Message message = MessageBuilder.withBody(value).build();
             getJsonTypeName(event).ifPresent(typeName ->message.getMessageProperties().getHeaders().put(EVENT_TYPE, typeName));
             message.getMessageProperties().getHeaders().put(CHANNEL, event.getChannel());
+
+            if(executionContext != null) {
+                message.getMessageProperties().getHeaders().put(Headers.ACCESS_TOKEN, executionContext.jwt());
+                message.getMessageProperties().getHeaders().put(Headers.USER_ID, executionContext.userId().id());
+            }
+
             if(event instanceof ProjectEvent) {
                 var projectId = ((ProjectEvent) event).projectId().value();
                 message.getMessageProperties().getHeaders().put(PROJECT_ID, projectId);
@@ -54,7 +62,11 @@ public class RabbitMQEventDispatcher implements EventDispatcher {
         } catch (JsonProcessingException | AmqpException e) {
             logger.info("Could not serialize event: {}", e.getMessage(), e);
         }
+    }
 
+    @Override
+    public void dispatchEvent(Event event) {
+      dispatchEvent(event, null);
     }
 /*
     TODO remove this after everything regarding events is clear
