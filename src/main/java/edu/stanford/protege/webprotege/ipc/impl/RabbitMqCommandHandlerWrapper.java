@@ -175,7 +175,7 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
             response.subscribe(r -> {
                 replyWithSuccessResponse(channel, message, userId, r);
                 long endtime = System.currentTimeMillis();
-                logger.info("Request executed " + request.getChannel() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
+                logger.info("Request executed {}. Time taken for Execution is : {}ms", request.getChannel(), endtime - startTime);
 
             }, throwable -> {
                 if (throwable instanceof CommandExecutionException ex) {
@@ -186,13 +186,12 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
                             request);
                     replyWithErrorResponse(message,channel, userId, ex.getStatus());
                     long endtime = System.currentTimeMillis();
-                    logger.info("Request failed " + request.getChannel() + "with error " + throwable.getMessage() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
+                    logger.info("Request failed {}with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endtime - startTime);
                 }
                 else {
                     replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
                     long endtime = System.currentTimeMillis();
-
-                    logger.info("Request failed " + request.getChannel() + "with error " + throwable.getMessage() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
+                    logger.info("Request failed {}with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endtime - startTime);
 
                 }
             });
