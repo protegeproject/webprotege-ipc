@@ -26,4 +26,6 @@ public class Headers {
     public static final String METHOD = PREFIX + "methodName";
 
     public static final String CHANNEL = PREFIX + "channel";
+
+    public static final String SERVICE_NAME = PREFIX + "serviceName";
 }

@@ -116,18 +116,18 @@ public class RabbitMqConfiguration {
 
     @Bean
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
-    public RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper(){
-       return new RabbitMqCommandHandlerWrapper<>(handlers, objectMapper, authorizationStatusExecutor);
+    public RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper(@Value("${spring.application.name}") String applicationName){
+       return new RabbitMqCommandHandlerWrapper<>(applicationName, handlers, objectMapper, authorizationStatusExecutor);
     }
 
     @Bean
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
-    public SimpleMessageListenerContainer messageListenerContainers() {
+    public SimpleMessageListenerContainer messageListenerContainers(RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper) {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setQueueNames(getCommandQueue());
         container.setConnectionFactory(connectionFactory);
         container.setChannelTransacted(false);
-        container.setMessageListener(rabbitMqCommandHandlerWrapper());
+        container.setMessageListener(rabbitMqCommandHandlerWrapper);
         container.setConcurrency("15-20");
         return container;
     }

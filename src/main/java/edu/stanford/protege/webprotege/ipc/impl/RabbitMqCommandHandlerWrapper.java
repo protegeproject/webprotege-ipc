@@ -1,6 +1,8 @@
 package edu.stanford.protege.webprotege.ipc.impl;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.exc.StreamReadException;
+import com.fasterxml.jackson.databind.DatabindException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.Channel;
@@ -14,14 +16,18 @@ import edu.stanford.protege.webprotege.common.UserId;
 import edu.stanford.protege.webprotege.ipc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpTimeoutException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.listener.api.ChannelAwareMessageListener;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.TimeoutException;
 
 import static edu.stanford.protege.webprotege.ipc.Headers.*;
@@ -33,12 +39,14 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     private final List<CommandHandler<? extends Request, ? extends Response>> handlers;
 
+    private final String applicationName;
 
     private final ObjectMapper objectMapper;
 
     private final CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
-    public RabbitMqCommandHandlerWrapper(List<CommandHandler<? extends Request, ? extends Response>> handlers, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
+    public RabbitMqCommandHandlerWrapper(@Value("${spring.application.name}") String applicationName, List<CommandHandler<? extends Request, ? extends Response>> handlers, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
+        this.applicationName = applicationName;
         this.handlers = handlers;
         this.objectMapper = objectMapper;
         this.authorizationStatusExecutor = authorizationStatusExecutor;
@@ -48,83 +56,91 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
     public void onMessage(Message message, Channel channel) throws Exception {
         var replyChannel = message.getMessageProperties().getReplyTo();
         if (replyChannel == null) {
-            String errorMessage = Headers.REPLY_CHANNEL + " header is missing.  Cannot reply to message.";
-            replyWithValidationError(message, channel, errorMessage);
-
+            var errorMessage = Headers.REPLY_CHANNEL + " header is missing.  Cannot reply to message.";
+            replyWithBadRequest(message, channel, errorMessage);
             return;
         }
 
         var correlationId = message.getMessageProperties().getCorrelationId();
         if (correlationId == null) {
-            String errorMessage = Headers.CORRELATION_ID + " header is missing.  Cannot process message.";
-            replyWithValidationError(message, channel, errorMessage);
+            var errorMessage = Headers.CORRELATION_ID + " header is missing.  Cannot process message.";
+            replyWithBadRequest(message, channel, errorMessage);
             return;
         }
 
         var userId = (String) message.getMessageProperties().getHeaders().get(USER_ID);
         if (userId == null) {
-            String errorMessage = USER_ID + " header is missing.  Cannot process message.  Returning Forbidden Error Code.  Message reply topic: "+replyChannel;
-            replyWithValidationError(message, channel, errorMessage);
+            var errorMessage = USER_ID + " header is missing.  Cannot process message.  Message reply topic: " + replyChannel;
+            replyWithBadRequest(message, channel, errorMessage);
             return;
         }
 
         var accessToken = String.valueOf(message.getMessageProperties().getHeaders().get(ACCESS_TOKEN));
-        if(accessToken == null) {
-            String errorMessage = ACCESS_TOKEN + " header is missing.  Cannot process message.  Returning Forbidden Error Code.  Message reply topic: " + replyChannel;
-            replyWithValidationError(message, channel, errorMessage);
+        if (accessToken == null) {
+            var errorMessage = ACCESS_TOKEN + " header is missing.  Cannot process message.  Message reply topic: " + replyChannel;
+            replyWithBadRequest(message, channel, errorMessage);
             return;
         }
 
         var messageType = (String) message.getMessageProperties().getHeaders().get(METHOD);
-        if(messageType == null) {
-
-            String errorMessage = METHOD + " header is missing.  Cannot process message.  Returning Forbidden Error Code.  Message reply topic: " + replyChannel;
-            replyWithValidationError(message, channel, errorMessage);
+        if (messageType == null) {
+            var errorMessage = METHOD + " header is missing.  Cannot process message.  Message reply topic: " + replyChannel;
+            replyWithBadRequest(message, channel, errorMessage);
             return;
         }
 
-        CommandHandler handler = extractHandler(messageType);
-        parseAndHandleRequest(handler, message, channel, new UserId(userId), accessToken);
+        var handler = extractHandler(messageType);
+        if (handler.isEmpty()) {
+            logger.warn("Command handler for message not found.  Message type: {}", messageType);
+            var errorMessage = "Cannot find command handler for messages type " + messageType;
+            var ex = new CommandExecutionException(HttpStatus.INTERNAL_SERVER_ERROR, "", errorMessage);
+            replyWithErrorResponse(message, channel, UserId.valueOf(userId), ex);
+        } else {
+            //noinspection unchecked
+            parseAndHandleRequest(handler.get(), message, channel, UserId.valueOf(userId), accessToken);
+        }
     }
 
-    private void replyWithValidationError(Message message, Channel channel, String errorMessage) throws IOException, TimeoutException {
-
-        AMQP.BasicProperties replyProps = new AMQP.BasicProperties
-                .Builder()
-                .correlationId(message.getMessageProperties().getCorrelationId())
-                .build();
-
-        logger.error(errorMessage);
-        channel.basicPublish("", message.getMessageProperties().getReplyTo(), replyProps, errorMessage.getBytes());
+    private void replyWithBadRequest(Message message, Channel channel, String errorMessage) {
+        logger.error("Replying to message with 400 (BAD REQUEST): {}", errorMessage);
+        replyWithErrorResponse(message, channel, null, CommandExecutionException.of(HttpStatus.BAD_REQUEST, errorMessage));
     }
 
-    private void parseAndHandleRequest(CommandHandler<Q,R> handler, Message message, Channel channel, UserId userId, String accessToken) {
+    private void parseAndHandleRequest(CommandHandler<Q, R> handler, Message message, Channel channel, UserId userId, String accessToken) {
         try {
-            var request = objectMapper.readValue( message.getBody(), handler.getRequestClass());
+            var request = objectMapper.readValue(message.getBody(), handler.getRequestClass());
             // The request has successfully been read.  All required headers are present and the request body
             // is well-formed so acknowledge the request (i.e. it shouldn't be dead-lettered)
             if (handler instanceof AuthorizedCommandHandler<Q, R> authorizedCommandHandler) {
                 authorizeAndReplyToRequest(handler, message, channel, userId, request, authorizedCommandHandler, accessToken);
-            }
-            else {
+            } else {
                 handleAndReplyToRequest(handler, channel, message, userId, request, accessToken);
             }
-
-        } catch (IOException e) {
-            logger.error("Could not parse request", e);
-            replyWithErrorResponse(message, channel, userId, HttpStatus.BAD_REQUEST);
+        }
+        catch (DatabindException | StreamReadException e) {
+            logger.error("Could not parse request.  Request: {}.  Error: {}", message.getBody(), e.getMessage(), e);
+            var msg = "Could not parse request: " + e.getMessage();
+            replyWithErrorResponse(message, channel, userId,
+                    CommandExecutionException.of(e, HttpStatus.BAD_REQUEST, msg));
+        }
+        catch (IOException e) {
+            logger.error("Could not read message.  Request: {}.  Error: {}", message.getBody(), e.getMessage(), e);
+            var msg = "Could not read request message: " + e.getMessage();
+            replyWithErrorResponse(message, channel, userId,
+                    CommandExecutionException.of(e, HttpStatus.INTERNAL_SERVER_ERROR, msg));
         }
     }
 
-    private CommandHandler<? extends Request, ? extends Response> extractHandler(String messageType){
+    @SuppressWarnings("rawtypes")
+    private Optional<CommandHandler> extractHandler(String messageType) {
         return this.handlers.stream().filter(handler -> {
                     return handler.getChannelName().equalsIgnoreCase(messageType);
-                } )
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Invalid message type " + messageType));
+                })
+                .map(h -> (CommandHandler) h)
+                .findFirst();
     }
 
-    private void authorizeAndReplyToRequest(CommandHandler<Q,R> handler,
+    private void authorizeAndReplyToRequest(CommandHandler<Q, R> handler,
                                             Message message,
                                             Channel channel,
                                             UserId userId,
@@ -143,101 +159,97 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
         authResponseFuture.whenComplete((authResponse, authError) -> {
             if (authError != null) {
                 // The call to the authorization service failed
-                logger.warn("An error occurred when requesting the authorization status for {} on {}. Error: {}",
+                logger.warn("Error requesting the authorization status for {} on {}. Error: {}",
                         userId,
                         resource,
                         authError.getMessage());
-                // Upstream Error
-                replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-            else {
+                replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(authError));
+            } else {
                 // The call to the authorization service succeeded
                 if (authResponse.authorizationStatus() == AuthorizationStatus.AUTHORIZED) {
                     handleAndReplyToRequest(handler, channel, message, userId, request, accessToken);
-                }
-                else {
+                } else {
                     logger.info("Permission denied when attempting to execute a request.  User: {}, Request: {}",
                             userId,
                             request);
-                    replyWithErrorResponse(message, channel, userId, HttpStatus.FORBIDDEN);
+                    var msg = "Permission denied for " + request + " on " + resource;
+                    replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(HttpStatus.FORBIDDEN, msg));
                 }
             }
 
         });
     }
 
-    private void handleAndReplyToRequest(CommandHandler<Q,R> handler, Channel channel, Message message, UserId userId, Q request, String accessToken) {
+    private void handleAndReplyToRequest(CommandHandler<Q, R> handler, Channel channel, Message message, UserId userId, Q request, String accessToken) {
         var executionContext = new ExecutionContext(userId, accessToken);
-        long startTime = System.currentTimeMillis();
-
+        var startTime = System.currentTimeMillis();
         try {
             var response = handler.handleRequest(request, executionContext);
             response.subscribe(r -> {
+                var endTime = System.currentTimeMillis();
+                logger.info("Request executed {}. Time taken for Execution is : {}ms", request.getChannel(), endTime - startTime);
                 replyWithSuccessResponse(channel, message, userId, r);
-                long endtime = System.currentTimeMillis();
-                logger.info("Request executed {}. Time taken for Execution is : {}ms", request.getChannel(), endtime - startTime);
-
             }, throwable -> {
-                if (throwable instanceof CommandExecutionException ex) {
-                    logger.info(
-                            "The command handler threw a CommandExecutionException exception while handling a request.  Sending an error as the reply.  Code: {}, Message: {},  Request: {}",
-                            ex.getStatusCode(),
-                            throwable.getMessage(),
-                            request);
-                    replyWithErrorResponse(message,channel, userId, ex.getStatus());
-                    long endtime = System.currentTimeMillis();
-                    logger.info("Request failed {}with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endtime - startTime);
-                }
-                else {
-                    replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
-                    long endtime = System.currentTimeMillis();
-                    logger.info("Request failed {}with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endtime - startTime);
-
-                }
+                var endTime = System.currentTimeMillis();
+                var ex = CommandExecutionException.of(throwable);
+                logger.info("Request failed {} with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endTime - startTime);
+                replyWithErrorResponse(message, channel, userId, ex);
             });
         } catch (Throwable throwable) {
-            logger.error("Uncaught exception when handling request", throwable);
-            replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
-            long endtime = System.currentTimeMillis();
-            logger.info("Request failed " + request.getChannel() + ". Time taken for Execution is : " + (endtime-startTime) +"ms");
-
+            // Catch any exception that had leaked out of the handleRequest method
+            var endTime = System.currentTimeMillis();
+            logger.info("Request failed {} with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endTime - startTime);
+            replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(throwable));
         }
     }
 
-    private void replyWithErrorResponse(Message message, Channel channel, UserId userId, HttpStatus status) {
+    private void replyWithErrorResponse(Message message, Channel channel, @Nullable UserId userId, CommandExecutionException executionException) {
         try {
-
-            var executionException = new CommandExecutionException(status);
             var value = serializeCommandExecutionException(executionException);
-            Map<String, Object> headersMap = new HashMap<>();
+            var headersMap = new HashMap<String, Object>();
             headersMap.put(ERROR, String.valueOf(value));
-            headersMap.put(USER_ID, String.valueOf(userId.id()));
-            AMQP.BasicProperties replyProps = new AMQP.BasicProperties
+            if (userId != null) {
+                headersMap.put(USER_ID, String.valueOf(userId.id()));
+            }
+            headersMap.put(SERVICE_NAME, applicationName);
+            var replyProps = new AMQP.BasicProperties
                     .Builder()
                     .correlationId(message.getMessageProperties().getCorrelationId())
                     .headers(headersMap)
                     .build();
-
-
             channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
-        } catch (Exception e){
-            logger.error("Error replyWithErrorResponse ", e);
+        } catch (Exception e) {
+            logger.error("Error publsihing reponse ", e);
         }
     }
 
     private void replyWithSuccessResponse(Channel channel, Message message, UserId userId, R response) {
         try {
             var value = objectMapper.writeValueAsBytes(response);
-
-            AMQP.BasicProperties replyProps = new AMQP.BasicProperties
+            var headersMap = new HashMap<String, Object>();
+            headersMap.put(SERVICE_NAME, applicationName);
+            var replyProps = new AMQP.BasicProperties
                     .Builder()
                     .correlationId(message.getMessageProperties().getCorrelationId())
+                    .headers(headersMap)
                     .build();
 
             channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value);
-        } catch (Exception e) {
+        } catch (JsonProcessingException e) {
+            logger.error("Error serializing response.  Response: {}.  Error: {}", response, e.getMessage(), e);
+            var msg = "Could not serialize response: " + e.getMessage();
+            replyWithErrorResponse(message, channel, userId,
+                    CommandExecutionException.of(e, HttpStatus.INTERNAL_SERVER_ERROR, msg));
+        }
+        catch (IOException e) {
+            logger.error("Error creating and sending response.  Response: {}.  Error: {}", response, e.getMessage(), e);
+            var msg = "Error creating and sending response: " + e.getMessage();
+            replyWithErrorResponse(message, channel, userId,
+                    CommandExecutionException.of(e, HttpStatus.INTERNAL_SERVER_ERROR, msg));
+        }
+        catch (Throwable e) {
             logger.error("Error handling replyWithSuccessResponse ", e);
-            replyWithErrorResponse(message, channel, userId, HttpStatus.INTERNAL_SERVER_ERROR);
+            replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(e));
         }
     }
 
@@ -248,9 +260,11 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
             logger.error("Error while serializing CommandExecutionException", e);
             return """
                     {
-                        "statusCode" : 500
+                        "statusCode" : 500,
+                        "causeMessage" : "%s",
+                        "causeClassName" "com.fasterxml.jackson.core.JsonProcessingException"
                     }
-                    """.strip();
+                    """.formatted(e.getMessage()).strip();
         }
 
     }

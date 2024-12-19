@@ -10,6 +10,8 @@ import org.mockito.Captor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.test.context.TestPropertySource;
 
 import java.util.UUID;
@@ -18,6 +20,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 
 /**
@@ -28,6 +31,7 @@ import static org.mockito.Mockito.verify;
 @SpringBootTest(classes = WebProtegeIpcApplication.class)
 @TestPropertySource(properties = "webprotege.rabbitmq.event-subscribe=true")
 public class EventHandler_TestCase extends IntegrationTestsExtension {
+
     public static CountDownLatch countDownLatch;
 
     @Autowired
@@ -36,11 +40,8 @@ public class EventHandler_TestCase extends IntegrationTestsExtension {
     private static final String EVENT_ID = UUID.randomUUID().toString();
     private final ProjectId projectId = ProjectId.generate();
 
-    @SpyBean
-    private static TestEventHandler testEventHandler;
-
-    @Captor
-    ArgumentCaptor<? extends Event> testHandlerCaptor;
+    @Autowired
+    private TestEventHandler testEventHandler;
 
     @Test
     void shouldInstantiateEventDispatcher() {
@@ -54,8 +55,8 @@ public class EventHandler_TestCase extends IntegrationTestsExtension {
     void shouldContainEventId() throws InterruptedException {
         eventDispatcher.dispatchEvent(new TestEvent(EVENT_ID, projectId.id()));
         assertThat(countDownLatch.await(60, TimeUnit.SECONDS)).isTrue();
-        verify(testEventHandler).handleEvent((TestEvent) testHandlerCaptor.capture());
-        var event = testHandlerCaptor.getValue();
+        assertThat(testEventHandler.isHandledEvents()).isTrue();
+        var event = testEventHandler.getHandledEvent();
         assertEquals(EVENT_ID, event.eventId().id());
     }
 
@@ -63,18 +64,18 @@ public class EventHandler_TestCase extends IntegrationTestsExtension {
     void shouldContainProjectId() throws InterruptedException {
         eventDispatcher.dispatchEvent(new TestEvent(EVENT_ID, projectId.id()));
         assertThat(countDownLatch.await(60, TimeUnit.SECONDS)).isTrue();
-        verify(testEventHandler).handleEvent((TestEvent) testHandlerCaptor.capture());
-        TestEvent event = (TestEvent) testHandlerCaptor.getValue();
+        assertThat(testEventHandler.isHandledEvents()).isTrue();
+        var event = testEventHandler.getHandledEvent();
         assertEquals(projectId.id(), event.projectId().value());
     }
 
-/*    @Configuration
+    @Configuration
     public static class TestConfiguration {
 
         @Bean
         public EventHandler<TestEvent> getEventHandler(){
-            return testEventHandler;
+            return new TestEventHandler();
         }
 
-    }*/
+    }
 }

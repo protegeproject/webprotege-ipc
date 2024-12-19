@@ -35,8 +35,8 @@ public class WebProtegeIpcApplication {
 	}
 
 	@Bean
-	EventDispatcher eventDispatcher(ObjectMapper objectMapper, RabbitTemplate eventRabbitTemplate) {
-		return new RabbitMQEventDispatcher(objectMapper,eventRabbitTemplate);
+	EventDispatcher eventDispatcher(@Value("${spring.application.name}") String applicationName, ObjectMapper objectMapper, RabbitTemplate eventRabbitTemplate) {
+		return new RabbitMQEventDispatcher(applicationName, objectMapper,eventRabbitTemplate);
 	}
 
 	@Bean

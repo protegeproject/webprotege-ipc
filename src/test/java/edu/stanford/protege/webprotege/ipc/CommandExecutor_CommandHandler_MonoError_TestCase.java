@@ -14,7 +14,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
-import org.springframework.test.annotation.DirtiesContext;
 import reactor.core.publisher.Mono;
 
 import javax.annotation.Nonnull;
@@ -25,13 +24,8 @@ import java.util.concurrent.TimeUnit;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-/**
- * Matthew Horridge
- * Stanford Center for Biomedical Informatics Research
- * 2022-02-09
- */
 @SpringBootTest
-public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends IntegrationTestsExtension {
+public class CommandExecutor_CommandHandler_MonoError_TestCase extends IntegrationTestsExtension {
 
     @Autowired
     CommandExecutor<TestRequest, TestResponse> executor;
@@ -60,10 +54,10 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends 
             var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"), ""));
             response.get(30, TimeUnit.SECONDS);
         }).isInstanceOf(ExecutionException.class)
-          .hasCauseInstanceOf(CommandExecutionException.class)
-          .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getStatusCode() == 500)
-          .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getCauseMessage().equals(TestCommandHandler.EXCEPTION_MSG))
-          .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getCauseClassName().equals(RuntimeException.class.getName()));
+                .hasCauseInstanceOf(CommandExecutionException.class)
+                .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getStatusCode() == 500)
+                .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getCauseMessage().equals(TestCommandHandler.EXCEPTION_MSG))
+                .matches(throwable -> ((CommandExecutionException) throwable.getCause()).getCauseClassName().equals(RuntimeException.class.getName()));
 
     }
 
@@ -127,7 +121,7 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends 
     @WebProtegeHandler
     private static class TestCommandHandler implements CommandHandler<TestRequest, TestResponse> {
 
-        public static final String EXCEPTION_MSG = "Expected exception leaked by command handler";
+        public static final String EXCEPTION_MSG = "Expected exception returned by Mono";
 
         @Nonnull
         @Override
@@ -142,8 +136,7 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends 
 
         @Override
         public Mono<TestResponse> handleRequest(TestRequest request, ExecutionContext executionContext) {
-            // Deliberately throw an exception to simulate an uncaught exception
-            throw new RuntimeException(EXCEPTION_MSG);
+            return Mono.error(new RuntimeException(EXCEPTION_MSG));
         }
     }
 }
