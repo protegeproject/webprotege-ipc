@@ -4,12 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
-import edu.stanford.protege.webprotege.ipc.CommandExecutionException;
-import edu.stanford.protege.webprotege.ipc.CommandExecutor;
-import edu.stanford.protege.webprotege.ipc.ExecutionContext;
-import edu.stanford.protege.webprotege.ipc.Headers;
+import edu.stanford.protege.webprotege.ipc.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.AmqpException;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.AsyncRabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,37 +45,55 @@ public class CommandExecutorImpl<Q extends Request<R>, R extends Response> imple
     public CompletableFuture<R> execute(Q request, ExecutionContext executionContext) {
         try {
             var json = objectMapper.writeValueAsBytes(request);
-            org.springframework.amqp.core.Message rabbitRequest = new org.springframework.amqp.core.Message(json);
-            rabbitRequest.getMessageProperties().getHeaders().put(Headers.ACCESS_TOKEN, executionContext.jwt());
-            rabbitRequest.getMessageProperties().getHeaders().put(Headers.USER_ID, executionContext.userId().id());
-            rabbitRequest.getMessageProperties().getHeaders().put(Headers.METHOD, request.getChannel());
-
-            return asyncRabbitTemplate.sendAndReceive(request.getChannel(), rabbitRequest).thenApply(this::handleResponse);
+            var rabbitMsg = new Message(json);
+            var headers = rabbitMsg.getMessageProperties().getHeaders();
+            headers.put(Headers.ACCESS_TOKEN, executionContext.jwt());
+            headers.put(Headers.USER_ID, executionContext.userId().id());
+            headers.put(Headers.METHOD, request.getChannel());
+            return asyncRabbitTemplate.sendAndReceive(request.getChannel(), rabbitMsg).thenApply(this::handleResponse);
+        } catch (JsonProcessingException e) {
+            var serializationException = new MessageBodySerializationException(request, e);
+            logger.error("Error when serializing request", e);
+            return CompletableFuture.failedFuture(serializationException);
+        } catch (AmqpException e) {
+            logger.error("Error thrown by message broker", e);
+            return CompletableFuture.failedFuture(e);
         } catch (Exception e) {
-            logger.error("Error ", e);
-            throw new RuntimeException(e);
+            logger.error("Other error when executing request", e);
+            return CompletableFuture.failedFuture(e);
         }
     }
 
-
-    private R handleResponse(Message rabbitResponse) {
-        var exception = (String) rabbitResponse.getMessageProperties().getHeaders().get(Headers.ERROR);
-
-        if(exception != null) {
+    /**
+     * Handles a response message from Rabbit.  The rabbit messag is will either contain an error, stored
+     * in the error header, or its body will contain a {@link Response} serialized as JSON.  Deserialization first
+     * checks to see if there is an error header.  If there is, the error is deserialized as {@link CommandExecutionException}
+     * and this is thrown.  If there is no error header then the message body is deserialized a {@link Response} and
+     * this response is returned.
+     * @param rabbitResponseMsg The message to handle
+     * @return The message body deserialized as a {@link Response}
+     * @throws CommandExecutionException if the message has an error header.  The error header is deserialized as a
+     * {@link CommandExecutionException} and thrown
+     * @throws MessageErrorHeaderDeserializationException if the message has an error header and there was a problem
+     * deserializing the error header.
+     * @throws MessageBodyDeserializationException if there was a problem deserializing the message body.
+     */
+    private R handleResponse(Message rabbitResponseMsg) {
+        var errorHeader = (String) rabbitResponseMsg.getMessageProperties().getHeaders().get(Headers.ERROR);
+        if(errorHeader != null) {
             try {
-                logger.error("Found error on response {}. Action : {}" ,exception, rabbitResponse.getMessageProperties().getHeaders().get(Headers.METHOD));
-                throw objectMapper.readValue(exception, CommandExecutionException.class);
+                logger.info("Found error on response {}. Action : {}" ,errorHeader, rabbitResponseMsg.getMessageProperties().getHeaders().get(Headers.METHOD));
+                throw objectMapper.readValue(errorHeader, CommandExecutionException.class);
             } catch (JsonProcessingException e) {
-                logger.error("Error ", e);
-                throw new RuntimeException(e);
+                logger.error("Error deserializing CommandExecutionException. Error header: {}. Exception {}", errorHeader, e.getMessage(), e);
+                throw new MessageErrorHeaderDeserializationException(errorHeader, e);
             }
         } else {
             try {
-                return objectMapper.readValue(rabbitResponse.getBody(), responseClass);
+                return objectMapper.readValue(rabbitResponseMsg.getBody(), responseClass);
             } catch (IOException e) {
-                logger.error("Error ", e);
-
-                throw new RuntimeException(e);
+                logger.error("Error deserializing reply message. Body: {} Cause: {}", rabbitResponseMsg.getBody(), e.getMessage(), e);
+                throw new MessageBodyDeserializationException(rabbitResponseMsg.getBody(), e);
             }
         }
     }
