@@ -149,11 +149,11 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
                                             String accessToken) {
         var resource = authenticatingCommandHandler.getTargetResource(request);
         var subject = Subject.forUser(userId);
-        var requiredActionId = authenticatingCommandHandler.getRequiredCapabilities();
+        var requiredCapabilities = authenticatingCommandHandler.getRequiredCapabilities();
         // Call to the authorization service to check
         var authRequest = new GetAuthorizationStatusRequest(resource,
                 subject,
-                requiredActionId.stream().findFirst().orElse(null));
+                requiredCapabilities.stream().findFirst().orElse(null));
         var executionContext = new ExecutionContext(userId, accessToken);
         var authResponseFuture = authorizationStatusExecutor.execute(authRequest, executionContext);
         authResponseFuture.whenComplete((authResponse, authError) -> {

@@ -1,6 +1,6 @@
 package edu.stanford.protege.webprotege.ipc;
 
-import edu.stanford.protege.webprotege.authorization.ActionId;
+import edu.stanford.protege.webprotege.authorization.Capability;
 import edu.stanford.protege.webprotege.authorization.Resource;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
@@ -22,5 +22,5 @@ public interface AuthorizedCommandHandler<Q extends Request<R>, R extends Respon
     Resource getTargetResource(Q request);
 
     @Nonnull
-    Collection<ActionId> getRequiredCapabilities();
+    Collection<Capability> getRequiredCapabilities();
 }
