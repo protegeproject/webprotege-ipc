@@ -50,6 +50,7 @@ public class CommandExecutorImpl<Q extends Request<R>, R extends Response> imple
             headers.put(Headers.ACCESS_TOKEN, executionContext.jwt());
             headers.put(Headers.USER_ID, executionContext.userId().id());
             headers.put(Headers.METHOD, request.getChannel());
+            headers.put(Headers.CORRELATION_ID, executionContext.correlationId());
             return asyncRabbitTemplate.sendAndReceive(request.getChannel(), rabbitMsg).thenApply(this::handleResponse);
         } catch (JsonProcessingException e) {
             var serializationException = new MessageBodySerializationException(request, e);
