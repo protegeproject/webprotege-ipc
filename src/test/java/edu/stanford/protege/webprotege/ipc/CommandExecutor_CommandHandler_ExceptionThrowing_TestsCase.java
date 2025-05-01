@@ -57,7 +57,7 @@ public class CommandExecutor_CommandHandler_ExceptionThrowing_TestsCase extends 
     void shouldSendRequestAndReceivedInternalServerErrorFromCommand() {
         var id = UUID.randomUUID().toString();
         assertThatThrownBy(() -> {
-            var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"), ""));
+            var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"), "", UUID.randomUUID().toString()));
             response.get(30, TimeUnit.SECONDS);
         }).isInstanceOf(ExecutionException.class)
           .hasCauseInstanceOf(CommandExecutionException.class)

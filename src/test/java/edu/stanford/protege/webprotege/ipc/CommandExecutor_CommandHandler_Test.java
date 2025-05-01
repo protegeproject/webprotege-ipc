@@ -53,7 +53,7 @@ public class CommandExecutor_CommandHandler_Test extends IntegrationTestsExtensi
     void shouldSendAndReceivedCommand() throws  ExecutionException, InterruptedException, TimeoutException {
         var id = UUID.randomUUID().toString();
         var response = executor.execute(new TestRequest(id), new ExecutionContext(new UserId("JohnSmith"),
-                                                                                "access-token-value"));
+                                                                                "access-token-value", UUID.randomUUID().toString()));
         var res = response.get(5000, TimeUnit.SECONDS);
         assertThat(res).isNotNull();
         assertThat(res.getId()).isEqualTo(id);
