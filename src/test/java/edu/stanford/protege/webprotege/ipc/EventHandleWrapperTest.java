@@ -4,25 +4,19 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.UserId;
 import edu.stanford.protege.webprotege.ipc.impl.RabbitMQEventHandlerWrapper;
-import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.junit.runner.RunWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
-import org.mockito.junit.MockitoJUnitRunner;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
@@ -66,7 +60,7 @@ public class EventHandleWrapperTest {
 
         eventHandler.onMessage(message);
 
-        verify(dummyEventHandler, times(0)).handleEvent(any(), eq(new ExecutionContext(UserId.valueOf("dummy-test-user"), "testJwt")));
+        verify(dummyEventHandler, times(0)).handleEvent(any(), eq(new ExecutionContext(UserId.valueOf("dummy-test-user"), "testJwt", UUID.randomUUID().toString())));
     }
 
     @Test

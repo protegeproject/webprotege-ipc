@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageListener;
+import edu.stanford.protege.webprotege.ipc.util.CorrelationMDCUtil;
 
 import java.io.IOException;
 import java.util.List;
@@ -30,34 +31,42 @@ public class RabbitMQEventHandlerWrapper<T extends Event> implements MessageList
 
     @Override
     public void onMessage(Message message) {
-        EventHandler eventHandler = eventHandlers.stream()
-                .filter(handler -> {
-                    String channel = String.valueOf(message.getMessageProperties().getHeaders().get(CHANNEL));
-                    return channel.contains(handler.getChannelName());
-                }).findFirst()
-                .orElse(null);
-        if(eventHandler != null) {
-            try {
-                T event = (T) objectMapper.readValue(message.getBody(), eventHandler.getEventClass());
-                var accessToken = String.valueOf(message.getMessageProperties().getHeaders().get(ACCESS_TOKEN));
-                var userId = (String) message.getMessageProperties().getHeaders().get(USER_ID);
+        String correlationId = message.getMessageProperties().getCorrelationId();
+        try {
+            // Set correlation ID in MDC
+            CorrelationMDCUtil.setCorrelationId(correlationId);
+            
+            EventHandler eventHandler = eventHandlers.stream()
+                    .filter(handler -> {
+                        String channel = String.valueOf(message.getMessageProperties().getHeaders().get(CHANNEL));
+                        return channel.contains(handler.getChannelName());
+                    }).findFirst()
+                    .orElse(null);
+            if(eventHandler != null) {
+                try {
+                    T event = (T) objectMapper.readValue(message.getBody(), eventHandler.getEventClass());
+                    var accessToken = String.valueOf(message.getMessageProperties().getHeaders().get(ACCESS_TOKEN));
+                    var userId = (String) message.getMessageProperties().getHeaders().get(USER_ID);
+                    if(accessToken != null && !accessToken.isEmpty() && !"null".equalsIgnoreCase(accessToken)){
+                        ExecutionContext executionContext = new ExecutionContext(UserId.valueOf(userId), accessToken, correlationId);
+                        try {
+                            eventHandler.handleEvent(event, executionContext);
 
-                if(accessToken != null && !accessToken.isEmpty() && !"null".equalsIgnoreCase(accessToken)){
-                    ExecutionContext executionContext = new ExecutionContext(UserId.valueOf(userId), accessToken);
-                    try {
-                        eventHandler.handleEvent(event, executionContext);
-
-                    } catch (EventHandlerMethodNotImplemented e){
+                        } catch (EventHandlerMethodNotImplemented e){
+                            eventHandler.handleEvent(event);
+                        }
+                    } else {
                         eventHandler.handleEvent(event);
                     }
-                } else {
-                    eventHandler.handleEvent(event);
-                }
 
-            } catch (IOException e) {
-                logger.error("Error when handling event "+ message.getMessageProperties().getMessageId(), e);
-                throw new RuntimeException(e);
+                } catch (IOException e) {
+                    logger.error("Error when handling event "+ message.getMessageProperties().getMessageId(), e);
+                    throw new RuntimeException(e);
+                }
             }
+        } finally {
+            // Clear correlation ID from MDC
+            CorrelationMDCUtil.clearCorrelationId();
         }
     }
 }

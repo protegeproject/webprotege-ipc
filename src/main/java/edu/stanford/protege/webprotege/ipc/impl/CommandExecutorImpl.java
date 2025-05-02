@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import edu.stanford.protege.webprotege.common.Request;
 import edu.stanford.protege.webprotege.common.Response;
 import edu.stanford.protege.webprotege.ipc.*;
+import edu.stanford.protege.webprotege.ipc.util.CorrelationMDCUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.AmqpException;
@@ -50,6 +51,11 @@ public class CommandExecutorImpl<Q extends Request<R>, R extends Response> imple
             headers.put(Headers.ACCESS_TOKEN, executionContext.jwt());
             headers.put(Headers.USER_ID, executionContext.userId().id());
             headers.put(Headers.METHOD, request.getChannel());
+            String correlationId = CorrelationMDCUtil.getCorrelationId();
+            if(correlationId == null || correlationId.isEmpty()) {
+                correlationId = executionContext.correlationId();
+            }
+            headers.put(Headers.CORRELATION_ID, correlationId);
             return asyncRabbitTemplate.sendAndReceive(request.getChannel(), rabbitMsg).thenApply(this::handleResponse);
         } catch (JsonProcessingException e) {
             var serializationException = new MessageBodySerializationException(request, e);
