@@ -56,9 +56,8 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
         var replyChannel = message.getMessageProperties().getReplyTo();
         String correlationId = (String) message.getMessageProperties().getHeaders().get(CORRELATION_ID);
         if (correlationId == null) {
-            var errorMessage = Headers.CORRELATION_ID + " header is missing.  Cannot process message.";
-            replyWithBadRequest(message, channel, errorMessage, UUID.randomUUID().toString());
-            return;
+            logger.warn(Headers.CORRELATION_ID + " header is missing. Setting a new ID.");
+            CorrelationMDCUtil.setCorrelationId(UUID.randomUUID().toString());
         } else {
             CorrelationMDCUtil.setCorrelationId(correlationId);
         }
