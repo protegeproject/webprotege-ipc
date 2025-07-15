@@ -25,8 +25,8 @@ jobs:
           java-version: '17'
           distribution: 'adopt'
           server-id: central
-          server-username: MAVEN_CENTRAL_USERNAME
-          server-password: MAVEN_CENTRAL_TOKEN
+          server-username: OSSRH_USERNAME
+          server-password: OSSRH_TOKEN
           gpg-private-key: ${{secrets.GPG_PRIVATE_KEY}}
           gpg-passphrase: GPG_PASSPHRASE
       - name: Bump version
@@ -44,5 +44,5 @@ jobs:
 
 env:
   GPG_PASSPHRASE: ${{secrets.GPG_PASSPHRASE}}
-  MAVEN_CENTRAL_USERNAME: ${{secrets.MAVEN_CENTRAL_USERNAME}}
-  MAVEN_CENTRAL_TOKEN: ${{secrets.MAVEN_CENTRAL_TOKEN}}
+  OSSRH_USERNAME: ${{secrets.OSSRH_USERNAME}}
+  OSSRH_TOKEN: ${{secrets.OSSRH_TOKEN}}
