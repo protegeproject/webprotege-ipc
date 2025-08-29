@@ -46,6 +46,8 @@ public class RabbitMqConfiguration {
     @Value("${webprotege.rabbitmq.timeout}")
     public Long rabbitMqTimeout;
 
+    @Value("${webprotege.rabbitmq.prefetch-count:10}")
+    private int prefetchCount;
 
     public static final String COMMANDS_EXCHANGE = "webprotege-exchange";
 
@@ -111,6 +113,8 @@ public class RabbitMqConfiguration {
         container.setQueues(replyQueue);
         container.setChannelTransacted(false);
         container.setConcurrency("15-20");
+        // Use manual acknowledgment to properly handle errors
+        container.setAcknowledgeMode(AcknowledgeMode.MANUAL);
         return container;
     }
 
@@ -129,6 +133,8 @@ public class RabbitMqConfiguration {
         container.setChannelTransacted(false);
         container.setMessageListener(rabbitMqCommandHandlerWrapper);
         container.setConcurrency("15-20");
+        // Use manual acknowledgment to properly handle errors
+        container.setAcknowledgeMode(AcknowledgeMode.MANUAL);
         return container;
     }
 
@@ -140,7 +146,7 @@ public class RabbitMqConfiguration {
             channel.exchangeDeclare(COMMANDS_EXCHANGE, "direct", true);
             channel.queueDeclare(getCommandQueue(), true, false, false, null);
             channel.queueDeclare(getCommandResponseQueue(), true, false, false, null);
-            channel.basicQos(1);
+            channel.basicQos(prefetchCount);
 
             for (CommandHandler handler : handlers) {
                 logger.info("Declaring binding queue {} to exchange {} with key {}", getCommandQueue(), COMMANDS_EXCHANGE, handler.getChannelName());
