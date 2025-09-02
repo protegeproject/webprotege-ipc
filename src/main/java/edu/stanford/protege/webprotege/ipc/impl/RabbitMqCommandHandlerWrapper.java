@@ -220,11 +220,13 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
                     .correlationId(message.getMessageProperties().getCorrelationId())
                     .headers(headersMap)
                     .build();
-            channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
+            try {
+                channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
             throw executionException;
-        } catch (Exception e) {
-            logger.error("Error publishing response ", e);
-            throw new RuntimeException("Error publishing response ", e);
+
         } finally {
             CorrelationMDCUtil.clearCorrelationId();
         }
