@@ -10,6 +10,8 @@ Common infrastructure for WebProtege microservices inter-process-communication
 
 ## Key interfaces and classes
 
+
+
 [**CommandExecutor**](https://github.com/protegeproject/webprotege-ipc/blob/main/src/main/java/edu/stanford/protege/webprotege/ipc/CommandExecutor.java) – Used to dispatch specific types of outgoing commands that are handled by some microservice.  See [executing requests and receiving responses](https://github.com/protegeproject/webprotege-next-gen/wiki/Microservice-Implementation#executing-requests-and-receiving-responses) for an example.
 
 [**CommandHandler**](https://github.com/protegeproject/webprotege-ipc/blob/main/src/main/java/edu/stanford/protege/webprotege/ipc/CommandHandler.java) – Used by microservice implementations to handle specific types of incoming commands.  See [handling calls from other services](https://github.com/protegeproject/webprotege-next-gen/wiki/Microservice-Implementation#handling-calls-from-other-services) for an example.
