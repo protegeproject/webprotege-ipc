@@ -62,7 +62,7 @@ public class RabbitMqCommandHandlerWrapperTest {
         wrapper = new RabbitMqCommandHandlerWrapper<>("test-app", 
                                                     Collections.singletonList(mockHandler), 
                                                     objectMapper, 
-                                                    mockAuthExecutor);
+                                                    mockAuthExecutor,10000);
         when(mockHandler.getChannelName()).thenReturn("test-channel");
         
         // Setup ObjectMapper mocks for common operations
@@ -100,9 +100,7 @@ public class RabbitMqCommandHandlerWrapperTest {
         Message message = createMessageWithoutCorrelationId();
         
         // When
-        assertThatThrownBy(() ->  wrapper.onMessage(message, mockChannel))
-                .isInstanceOf(CommandExecutionException.class);
-
+        wrapper.onMessage(message, mockChannel);
         // Then
         // Verify that replyWithBadRequest was called with the correct parameters
         verify(mockChannel).basicPublish(
