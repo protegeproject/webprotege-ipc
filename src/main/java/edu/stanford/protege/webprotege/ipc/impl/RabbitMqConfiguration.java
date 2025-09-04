@@ -190,7 +190,7 @@ public class RabbitMqConfiguration {
     @Bean
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
     public RabbitMqCommandHandlerWrapper rabbitMqCommandHandlerWrapper(@Value("${spring.application.name}") String applicationName){
-       return new RabbitMqCommandHandlerWrapper<>(applicationName, handlers, objectMapper, authorizationStatusExecutor);
+       return new RabbitMqCommandHandlerWrapper<>(applicationName, handlers, objectMapper, authorizationStatusExecutor, rabbitMqTimeout);
     }
 
     @Bean

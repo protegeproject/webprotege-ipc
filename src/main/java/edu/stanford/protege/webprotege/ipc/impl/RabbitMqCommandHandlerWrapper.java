@@ -24,7 +24,9 @@ import org.springframework.http.HttpStatus;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 import static edu.stanford.protege.webprotege.ipc.Headers.*;
 import static edu.stanford.protege.webprotege.ipc.impl.RabbitMqConfiguration.COMMANDS_EXCHANGE;
@@ -43,11 +45,14 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
 
     private final CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
 
-    public RabbitMqCommandHandlerWrapper(@Value("${spring.application.name}") String applicationName, List<CommandHandler<? extends Request, ? extends Response>> handlers, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor) {
+    private final long rabbitMqTimeout;
+
+    public RabbitMqCommandHandlerWrapper(@Value("${spring.application.name}") String applicationName, List<CommandHandler<? extends Request, ? extends Response>> handlers, ObjectMapper objectMapper, CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor, long rabbitMqTimeout) {
         this.applicationName = applicationName;
         this.handlers = handlers;
         this.objectMapper = objectMapper;
         this.authorizationStatusExecutor = authorizationStatusExecutor;
+        this.rabbitMqTimeout = rabbitMqTimeout;
     }
 
     @Override
@@ -139,6 +144,7 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
                 .findFirst();
     }
 
+
     private void authorizeAndReplyToRequest(CommandHandler<Q, R> handler,
                                             Message message,
                                             Channel channel,
@@ -155,46 +161,42 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
                 subject,
                 requiredCapabilities.stream().findFirst().orElse(null));
         var executionContext = new ExecutionContext(userId, accessToken, correlationId);
-        var authResponseFuture = authorizationStatusExecutor.execute(authRequest, executionContext);
-        authResponseFuture.whenComplete((authResponse, authError) -> {
-            if (authError != null) {
-                // The call to the authorization service failed
-                logger.warn("Error requesting the authorization status for {} on {}. Error: {}",
-                        userId,
-                        resource,
-                        authError.getMessage());
-                replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(authError), correlationId);
+        
+        try {
+            var authResponse = authorizationStatusExecutor.execute(authRequest, executionContext).get(5, TimeUnit.SECONDS);
+            if (authResponse.authorizationStatus() == AuthorizationStatus.AUTHORIZED) {
+                handleAndReplyToRequest(handler, channel, message, userId, request, accessToken, correlationId);
             } else {
-                // The call to the authorization service succeeded
-                if (authResponse.authorizationStatus() == AuthorizationStatus.AUTHORIZED) {
-                    handleAndReplyToRequest(handler, channel, message, userId, request, accessToken, correlationId);
-                } else {
-                    logger.info("Permission denied when attempting to execute a request.  User: {}, Request: {}",
-                            userId,
-                            request);
-                    var msg = "Permission denied for " + request + " on " + resource;
-                    replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(HttpStatus.FORBIDDEN, msg), correlationId);
-                }
+                logger.info("Permission denied when attempting to execute a request.  User: {}, Request: {}",
+                        userId,
+                        request);
+                var msg = "Permission denied for " + request + " on " + resource;
+                replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(HttpStatus.FORBIDDEN, msg), correlationId);
             }
-
-        });
+        } catch (Exception e) {
+            // The call to the authorization service failed
+            logger.warn("Error requesting the authorization status for {} on {}. Error: {}",
+                    userId,
+                    resource,
+                    e.getMessage());
+            replyWithErrorResponse(message, channel, userId, CommandExecutionException.of(e), correlationId);
+        }
     }
 
     private void handleAndReplyToRequest(CommandHandler<Q, R> handler, Channel channel, Message message, UserId userId, Q request, String accessToken, String correlationId) {
         var executionContext = new ExecutionContext(userId, accessToken, correlationId);
         var startTime = System.currentTimeMillis();
         try {
-            var response = handler.handleRequest(request, executionContext);
-            response.subscribe(r -> {
-                var endTime = System.currentTimeMillis();
-                logger.info("Request executed {}. Time taken for Execution is : {}ms", request.getChannel(), endTime - startTime);
-                replyWithSuccessResponse(channel, message, userId, r, correlationId);
-            }, throwable -> {
-                var endTime = System.currentTimeMillis();
-                var ex = CommandExecutionException.of(throwable);
-                logger.info("Request failed {} with error {}. Time taken for Execution is : {}ms", request.getChannel(), throwable.getMessage(), endTime - startTime);
-                replyWithErrorResponse(message, channel, userId, ex, correlationId);
-            });
+            /**
+             * [Architectural decision] We decided on a meeting on 03.09.2025 to move from async processing
+             * within the callee to a synchronous process so Spring can handle better the Auto ACK. We have issues with auto ack and uncorrelated request/responses.
+             */
+            var responseMono = handler.handleRequest(request, executionContext);
+            var response = responseMono.block(Duration.ofMillis(rabbitMqTimeout));
+            var endTime = System.currentTimeMillis();
+            logger.info("Request executed {}. Time taken for Execution is : {}ms", request.getChannel(), endTime - startTime);
+            replyWithSuccessResponse(channel, message, userId, response, correlationId);
+
         } catch (Throwable throwable) {
             // Catch any exception that had leaked out of the handleRequest method
             var endTime = System.currentTimeMillis();
@@ -223,9 +225,10 @@ public class RabbitMqCommandHandlerWrapper<Q extends Request<R>, R extends Respo
             try {
                 channel.basicPublish(COMMANDS_EXCHANGE, message.getMessageProperties().getReplyTo(), replyProps, value.getBytes());
             } catch (IOException e) {
-                throw new RuntimeException(e);
+                logger.error("Could not publish error reply", e);
             }
-            throw executionException;
+            // Log the error, but DO NOT re-throw, to prevent the retry-spam loop with AUTO acknowledgment
+            logger.error("Replied with an error response. Request correlation ID: {}. Error: {}", correlationId, executionException.getMessage(), executionException);
 
         } finally {
             CorrelationMDCUtil.clearCorrelationId();
