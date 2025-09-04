@@ -155,9 +155,6 @@ public class RabbitMqConfiguration {
        rabbitTemplate.setReplyTimeout(rabbitMqTimeout);
        rabbitTemplate.setExchange(COMMANDS_EXCHANGE);
        
-       // Add retry template for resilience
-       rabbitTemplate.setRetryTemplate(retryTemplate());
-       
        return rabbitTemplate;
    }
 
@@ -204,6 +201,9 @@ public class RabbitMqConfiguration {
         container.setConcurrency("25-35");  // Increased from "15-20"
         // Use auto acknowledgment to let Spring handle it
         container.setAcknowledgeMode(AcknowledgeMode.AUTO);
+        
+        // Disable retry on failure
+        container.setDefaultRequeueRejected(false);
         
         return container;
     }
