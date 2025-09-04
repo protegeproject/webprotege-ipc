@@ -14,14 +14,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.AsyncRabbitTemplate;
-import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.Connection;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
-import org.springframework.retry.policy.SimpleRetryPolicy;
-import org.springframework.retry.backoff.ExponentialBackOffPolicy;
-import org.springframework.retry.support.RetryTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,37 +48,6 @@ public class RabbitMqConfiguration {
 
     @Value("${webprotege.rabbitmq.prefetch-count:25}")
     private int prefetchCount;
-
-    @Value("${webprotege.rabbitmq.connection-timeout:30000}")
-    private int connectionTimeout;
-
-    @Value("${webprotege.rabbitmq.heartbeat:60}")
-    private int heartbeat;
-
-    @Value("${webprotege.rabbitmq.connection-pool-size:20}")
-    private int connectionPoolSize;
-
-    @Value("${webprotege.rabbitmq.retry-max-attempts:3}")
-    private int maxRetryAttempts;
-
-    @Value("${webprotege.rabbitmq.retry-initial-interval:1000}")
-    private long initialRetryInterval;
-
-    @Value("${webprotege.rabbitmq.retry-multiplier:2.0}")
-    private double retryMultiplier;
-
-    @Value("${webprotege.rabbitmq.retry-max-interval:10000}")
-    private long maxRetryInterval;
-
-    @Value("${webprotege.rabbitmq.channel-cache-size:50}")
-    private int channelCacheSize;
-
-    @Value("${webprotege.rabbitmq.connection-cache-size:5}")
-    private int connectionCacheSize;
-
-    @Value("${webprotege.rabbitmq.channel-checkout-timeout:60000}")
-    private int channelCheckoutTimeout;
-
     public static final String COMMANDS_EXCHANGE = "webprotege-exchange";
 
 
@@ -97,36 +62,6 @@ public class RabbitMqConfiguration {
 
     @Autowired
     private CommandExecutor<GetAuthorizationStatusRequest, GetAuthorizationStatusResponse> authorizationStatusExecutor;
-
-    @Bean
-    @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
-    public SimpleRetryPolicy retryPolicy() {
-        SimpleRetryPolicy policy = new SimpleRetryPolicy();
-        policy.setMaxAttempts(maxRetryAttempts);
-        logger.info("Configured retry policy with max attempts: {}", maxRetryAttempts);
-        return policy;
-    }
-
-    @Bean
-    @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
-    public ExponentialBackOffPolicy backOffPolicy() {
-        ExponentialBackOffPolicy policy = new ExponentialBackOffPolicy();
-        policy.setInitialInterval(initialRetryInterval);
-        policy.setMultiplier(retryMultiplier);
-        policy.setMaxInterval(maxRetryInterval);
-        logger.info("Configured backoff policy with initial interval: {}ms, multiplier: {}, max interval: {}ms", 
-                   initialRetryInterval, retryMultiplier, maxRetryInterval);
-        return policy;
-    }
-
-    @Bean
-    @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
-    public RetryTemplate retryTemplate() {
-        RetryTemplate template = new RetryTemplate();
-        template.setRetryPolicy(retryPolicy());
-        template.setBackOffPolicy(backOffPolicy());
-        return template;
-    }
 
     @Bean
     @ConditionalOnProperty(prefix = "webprotege.rabbitmq", name = "commands-subscribe", havingValue = "true", matchIfMissing = true)
@@ -217,9 +152,6 @@ public class RabbitMqConfiguration {
             channel.queueDeclare(getCommandQueue(), true, false, false, null);
             channel.queueDeclare(getCommandResponseQueue(), true, false, false, null);
             channel.basicQos(prefetchCount);
-
-            logger.info("Configuring RabbitMQ with prefetch count: {}, retry attempts: {}, connection pool: {}", 
-                       prefetchCount, maxRetryAttempts, connectionPoolSize);
 
             for (CommandHandler handler : handlers) {
                 logger.info("Declaring binding queue {} to exchange {} with key {}", getCommandQueue(), COMMANDS_EXCHANGE, handler.getChannelName());
