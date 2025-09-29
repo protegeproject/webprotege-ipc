@@ -18,7 +18,7 @@ public abstract class AwaiterCompletingEventHandler<K, E extends Event> implemen
 
     private final Class<E> eventClass;
 
-    private final EventAwaiter<K, E> awaiter;
+    private final EventAwaiter<K, ? super E> awaiter;
 
     private final Function<E, K> keyExtractor;
 
@@ -28,7 +28,7 @@ public abstract class AwaiterCompletingEventHandler<K, E extends Event> implemen
      * @param keyExtractor Function to extract the correlation key (e.g., EventId) from the event
      */
     protected AwaiterCompletingEventHandler(@Nonnull Class<E> eventClass,
-                                            @Nonnull EventAwaiter<K, E> awaiter,
+                                            @Nonnull EventAwaiter<K, ? super E> awaiter,
                                             @Nonnull Function<E, K> keyExtractor) {
         this.eventClass = Objects.requireNonNull(eventClass);
         this.awaiter = Objects.requireNonNull(awaiter);
