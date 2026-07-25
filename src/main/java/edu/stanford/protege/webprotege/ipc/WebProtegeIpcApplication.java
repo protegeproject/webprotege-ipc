@@ -35,8 +35,9 @@ public class WebProtegeIpcApplication {
 	}
 
 	@Bean
-	EventDispatcher eventDispatcher(@Value("${spring.application.name}") String applicationName, ObjectMapper objectMapper, RabbitTemplate eventRabbitTemplate) {
-		return new RabbitMQEventDispatcher(applicationName, objectMapper,eventRabbitTemplate);
+	EventDispatcher eventDispatcher(@Value("${spring.application.name}") String applicationName, ObjectMapper objectMapper, RabbitTemplate eventRabbitTemplate,
+									@Value("${webprotege.rabbitmq.timeout}") long confirmTimeout) {
+		return new RabbitMQEventDispatcher(applicationName, objectMapper, eventRabbitTemplate, confirmTimeout);
 	}
 
 	@Bean
