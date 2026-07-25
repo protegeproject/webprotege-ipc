@@ -6,6 +6,8 @@ import edu.stanford.protege.webprotege.common.Event;
 import edu.stanford.protege.webprotege.ipc.EventHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.amqp.core.AnonymousQueue;
+import org.springframework.amqp.core.Base64UrlNamingStrategy;
 import org.springframework.amqp.core.Binding;
 import org.springframework.amqp.core.BindingBuilder;
 import org.springframework.amqp.core.FanoutExchange;
@@ -34,6 +36,19 @@ public class RabbitMQEventsConfiguration implements DisposableBean {
     @Value("${webprotege.rabbitmq.eventsqueue:EVENTS_QUEUE}")
     public String eventsQueue;
 
+    /**
+     * When {@code true}, the events queue becomes per service <em>instance</em> instead of
+     * per service: a non-durable, exclusive, auto-delete queue with a uniquely generated name
+     * (the configured {@link #eventsQueue} value as a prefix), so every instance binds its own
+     * queue to the fanout exchange and therefore receives <em>every</em> event. Needed by
+     * horizontally-scaled consumers that pin long-lived streams to a single instance (e.g. the
+     * SSE gateway). Defaults to {@code false}, which keeps the historical competing-consumer
+     * semantics: one shared durable queue across all instances of a service, each event handled
+     * once. Do not flip the default — other services (e.g. backend-service) rely on it.
+     */
+    @Value("${webprotege.rabbitmq.event-queue-per-instance:false}")
+    public boolean eventQueuePerInstance;
+
 
     public static final String EVENT_EXCHANGE = "webprotege-event-exchange";
 
@@ -48,6 +63,12 @@ public class RabbitMQEventsConfiguration implements DisposableBean {
 
     @Bean
     public Queue eventsQueue() {
+        if (eventQueuePerInstance) {
+            // AnonymousQueue is non-durable, exclusive and auto-delete, with a generated name.
+            // Exclusive + auto-delete means a scaled-down instance's queue vanishes with it
+            // instead of lingering, unbound-but-durable, and growing forever.
+            return new AnonymousQueue(new Base64UrlNamingStrategy(eventsQueue + "-"));
+        }
         return new Queue(eventsQueue, true);
     }
 
@@ -94,11 +115,15 @@ public class RabbitMQEventsConfiguration implements DisposableBean {
 
     @Bean
     @ConditionalOnProperty(havingValue = "true", prefix = "webprotege.rabbitmq", name = "event-subscribe")
-    public SimpleMessageListenerContainer eventsListenerContainer(ConnectionFactory connectionFactory) {
-        logger.info("[RabbitMQEventConfiguration] Listening to event queue {}", eventsQueue);
+    public SimpleMessageListenerContainer eventsListenerContainer(ConnectionFactory connectionFactory, Queue eventsQueue) {
+        logger.info("[RabbitMQEventConfiguration] Listening to event queue {}", eventsQueue.getActualName());
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory);
-        container.setQueueNames(eventsQueue);
+        // Follow the queue object rather than a fixed name: in per-instance mode the actual
+        // queue name is generated, so setQueueNames(eventsQueue) would subscribe to a queue
+        // that never exists. The auto-configured RabbitAdmin re-declares the queue bean on
+        // reconnect, recreating the exclusive queue after a broker outage.
+        container.setQueues(eventsQueue);
         container.setMessageListener(new RabbitMQEventHandlerWrapper(eventHandlers, objectMapper));
         return container;
     }
@@ -106,7 +131,7 @@ public class RabbitMQEventsConfiguration implements DisposableBean {
     @Bean
     @ConditionalOnProperty(havingValue = "true", prefix = "webprotege.rabbitmq", name = "event-subscribe")
     public Binding binding(Queue eventsQueue, FanoutExchange fanoutExchange) {
-        logger.info("[RabbitMQEventConfiguration] Binding to event queue {}", eventsQueue);
+        logger.info("[RabbitMQEventConfiguration] Binding to event queue {}", eventsQueue.getActualName());
 
         return BindingBuilder.bind(eventsQueue).to(fanoutExchange);
     }
